@@ -1,0 +1,299 @@
+"""
+MMPA-DRP Extension Losses
+=========================
+Phase 1 minimal implementations for program-level alignment and contrastive losses.
+These are intended to replace / augment the sample-level contrastive loss in
+MACB-DRP Stage 3 with tissue-program prototype alignment and drug-gated program
+contrastive separation.
+"""
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+def program_prototype_alignment_loss(
+    source_z: torch.Tensor,
+    target_z: torch.Tensor,
+    source_tissue: torch.Tensor,
+    target_tissue: torch.Tensor,
+    drug_gate: torch.Tensor,
+    temperature: float = 0.1,
+) -> torch.Tensor:
+    """
+    ProgramPrototypeAlignmentLoss
+    =============================
+    Align tissue-level program prototypes across source and target domains,
+    weighted by drug mechanism gates.
+
+    Inputs:
+        source_z:       [Bs, K, d]   source program tokens
+        target_z:       [Bt, K, d]   target program tokens
+        source_tissue:  [Bs]         tissue labels for source
+        target_tissue:  [Bt]         tissue labels for target
+        drug_gate:      [D, K]       drug-specific program gates
+    Output:
+        loss_align:     scalar
+
+    TODO (Phase 2):
+        1. Compute per-tissue program prototypes by averaging z over samples
+           within each tissue type, separately for source and target.
+        2. Align source prototypes to target prototypes (or vice versa)
+           using a cross-domain prototype matching loss.
+        3. Optionally weight the alignment by drug_gate to focus on
+           drug-relevant programs.
+    """
+    # Phase 1: return a dummy zero loss to preserve interface
+    return torch.tensor(0.0, device=source_z.device, requires_grad=True)
+
+
+def program_prototype_contrastive_loss(
+    source_prototypes: torch.Tensor,
+    target_prototypes: torch.Tensor,
+    temperature: float = 0.1,
+) -> torch.Tensor:
+    """
+    ProgramPrototypeContrastiveLoss
+    ===============================
+    Contrastive separation at the tissue-program prototype level.
+
+    Inputs:
+        source_prototypes: [C, K, d]  source domain prototypes (C tissue types)
+        target_prototypes: [C, K, d]  target domain prototypes (C tissue types)
+    Output:
+        loss_contrast: scalar
+
+    TODO (Phase 2):
+        1. For each tissue c, treat source_prototypes[c] and target_prototypes[c]
+           as positive pairs.
+        2. Treat prototypes from different tissues as negatives.
+        3. Apply a contrastive objective (e.g., InfoNCE) at the program level.
+    """
+    # Phase 1: return a dummy zero loss to preserve interface
+    return torch.tensor(0.0, device=source_prototypes.device, requires_grad=True)
+
+
+class ProgramAlignmentLoss(nn.Module):
+    """
+    nn.Module wrapper for program_prototype_alignment_loss.
+    Useful if we need to store learnable parameters (e.g. prototype bank) later.
+    """
+
+    def __init__(self, temperature: float = 0.1):
+        super(ProgramAlignmentLoss, self).__init__()
+        self.temperature = temperature
+
+    def forward(
+        self,
+        source_z: torch.Tensor,
+        target_z: torch.Tensor,
+        source_tissue: torch.Tensor,
+        target_tissue: torch.Tensor,
+        drug_gate: torch.Tensor,
+    ) -> torch.Tensor:
+        return program_prototype_alignment_loss(
+            source_z, target_z, source_tissue, target_tissue, drug_gate, self.temperature
+        )
+
+
+class ProgramContrastiveLoss(nn.Module):
+    """
+    nn.Module wrapper for program_prototype_contrastive_loss.
+    """
+
+    def __init__(self, temperature: float = 0.1):
+        super(ProgramContrastiveLoss, self).__init__()
+        self.temperature = temperature
+
+    def forward(
+        self,
+        source_prototypes: torch.Tensor,
+        target_prototypes: torch.Tensor,
+    ) -> torch.Tensor:
+        return program_prototype_contrastive_loss(
+            source_prototypes, target_prototypes, self.temperature
+        )
+
+
+# =============================================================================
+# Program Auxiliary Losses (Phase 2)
+# =============================================================================
+
+def program_diversity_loss(z: torch.Tensor) -> torch.Tensor:
+    """
+    Encourage orthogonality among the K program tokens within each sample.
+
+    Input:
+        z: [B, K, d]
+    Output:
+        scalar loss (mean over batch)
+    """
+    B, K, d = z.shape
+    z_norm = F.normalize(z, p=2, dim=-1)  # [B, K, d]
+    sim = torch.bmm(z_norm, z_norm.transpose(1, 2))  # [B, K, K]
+
+    # Mask diagonal
+    mask = torch.eye(K, device=z.device).unsqueeze(0)  # [1, K, K]
+    sim_off = sim * (1 - mask)
+
+    # Mean squared off-diagonal similarity
+    loss = (sim_off ** 2).sum() / (B * K * (K - 1) + 1e-8)
+    return loss
+
+
+def program_sparsity_loss(q: torch.Tensor) -> torch.Tensor:
+    """
+    Encourage sparse program activation (low entropy over q).
+
+    Input:
+        q: [B, K]  (softmax weights)
+    Output:
+        scalar loss (mean entropy)
+    """
+    entropy = -(q * torch.log(q + 1e-8)).sum(dim=1).mean()
+    return entropy
+
+
+def program_reconstruction_loss(z: torch.Tensor, q: torch.Tensor, x_recon: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+    """
+    Placeholder for reconstruction loss.
+    In Phase 2 we do not instantiate a decoder yet, so this returns 0.
+    """
+    if x_recon is None:
+        return torch.tensor(0.0, device=z.device)
+    return F.mse_loss(x_recon, x)
+
+
+def compute_program_aux_losses(
+    program_out: dict,
+    x_recon: torch.Tensor = None,
+    x: torch.Tensor = None,
+    lambda_rec: float = 0.0,
+    lambda_div: float = 0.01,
+    lambda_sparse: float = 0.001,
+) -> tuple:
+    """
+    Compute optional auxiliary losses for program regularization.
+
+    Returns:
+        total_aux_loss, rec_loss, div_loss, sparse_loss
+    """
+    z = program_out["z"]
+    q = program_out["q"]
+
+    rec_loss = program_reconstruction_loss(z, q, x_recon, x)
+    div_loss = program_diversity_loss(z)
+    sparse_loss = program_sparsity_loss(q)
+
+    total = lambda_rec * rec_loss + lambda_div * div_loss + lambda_sparse * sparse_loss
+    return total, rec_loss, div_loss, sparse_loss
+
+
+# =============================================================================
+# Phase 3A: Disentanglement Losses
+# =============================================================================
+
+def orthogonality_loss(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+    """
+    Orthogonality loss inspired by DCDNet DiffLoss.
+    Encourages a and b to be orthogonal (low cosine similarity).
+
+    Compatible with:
+        a, b: [B, d]   or   [B, K, d]
+
+    Logic:
+        1. Flatten to [B, -1]
+        2. L2 normalize per sample
+        3. Compute batch-wise cosine similarity matrix: sim = a_norm @ b_norm.T
+        4. Return mean of sim^2
+    """
+    # Flatten
+    a_flat = a.view(a.size(0), -1)
+    b_flat = b.view(b.size(0), -1)
+
+    # L2 normalize (detach norm to avoid degenerate gradients)
+    a_norm = torch.norm(a_flat, p=2, dim=1, keepdim=True).detach()
+    a_flat = a_flat.div(a_norm.expand_as(a_flat) + 1e-6)
+
+    b_norm = torch.norm(b_flat, p=2, dim=1, keepdim=True).detach()
+    b_flat = b_flat.div(b_norm.expand_as(b_flat) + 1e-6)
+
+    # Cosine similarity matrix [B, B]
+    sim = torch.mm(a_flat, b_flat.t())
+    return torch.mean(sim.pow(2))
+
+
+def response_domain_adversarial_loss(
+    h_response: torch.Tensor,
+    domain_label: torch.Tensor,
+    discriminator,
+    grl_lambda: float = 1.0,
+) -> torch.Tensor:
+    """
+    Adversarial loss on response branch.
+    GRL makes h_response domain-invariant.
+    """
+    from mmpa_drp.models import GradientReversal
+
+    h_rev = GradientReversal.apply(h_response, grl_lambda)
+    logits = discriminator(h_rev).squeeze(-1)
+    return F.binary_cross_entropy_with_logits(logits, domain_label.float())
+
+
+def domain_nuisance_loss(
+    h_domain: torch.Tensor,
+    domain_label: torch.Tensor,
+    discriminator,
+) -> torch.Tensor:
+    """
+    Domain classification loss on domain-nuisance branch.
+    Makes h_domain retain domain information.
+    """
+    logits = discriminator(h_domain).squeeze(-1)
+    return F.binary_cross_entropy_with_logits(logits, domain_label.float())
+
+
+# =============================================================================
+# Phase 3B: Residual Soft Drug Gate Losses
+# =============================================================================
+
+def entropy_floor_loss(g, min_entropy=1.2, eps=1e-8):
+    """
+    Prevent gate from collapsing to one-hot.
+    Only penalizes when entropy < min_entropy.
+
+    g: [D, K] softmax probabilities
+    """
+    entropy = -(g * torch.log(g + eps)).sum(dim=-1)  # [D]
+    loss = F.relu(min_entropy - entropy).pow(2).mean()
+    return loss
+
+
+def gate_load_balance_loss(g, eps=1e-8):
+    """
+    Encourage uniform usage of programs across all drugs.
+
+    g: [D, K]
+    """
+    mean_usage = g.mean(dim=0)  # [K]
+    K = g.size(1)
+    uniform = torch.ones_like(mean_usage) / K
+    # KL(mean_usage || uniform)
+    loss = (mean_usage * torch.log((mean_usage + eps) / (uniform + eps))).sum()
+    return loss
+
+
+def gate_diversity_loss(g):
+    """
+    Encourage different drugs to have different gates.
+    Penalizes high off-diagonal cosine similarity.
+
+    g: [D, K]
+    """
+    g_norm = F.normalize(g, p=2, dim=-1)  # [D, K]
+    sim = torch.mm(g_norm, g_norm.t())  # [D, D]
+    # Mask diagonal
+    mask = 1.0 - torch.eye(g.size(0), device=g.device)
+    sim_off = sim * mask
+    loss = (sim_off ** 2).sum() / (mask.sum() + 1e-8)
+    return loss

@@ -1,0 +1,121 @@
+nohup: 忽略输入
+current config is Namespace(metric='auroc', measurement='Z_SCORE', thres_g=0.0, thres_s=0.1, n=5, alph=0.3, beta=0.3, num_programs=8, program_dim=64, lambda_div=0.01, lambda_sparse=0.001, use_drug_gate=False, shared_gate=False, gate_mode='additive_bias', gate_temperature=5.0, rho_init=0.0, beta_init=0.0, lambda_gate_entropy_floor=0.0, gate_min_entropy=1.2, lambda_gate_balance=0.0, lambda_gate_diversity=0.0, use_ot_alignment=True, lambda_ot=0.005, ot_reg=0.1, ot_max_iter=50, ot_cost_type='cosine', ot_marginal_type='uniform', use_cdan=True, ot_mode='global', ot_use_drug_conditioned_feature=False, ot_per_drug_lambda=None, drug_conditioned_ot_enabled=False, drug_conditioned_ot_mode='global', drug_conditioned_ot_replace_sample_ot=False, drug_conditioned_ot_global_lambda=0.005, drug_conditioned_ot_reg=0.1, drug_conditioned_ot_cost='cosine', drug_conditioned_ot_lambda_min=0.0, drug_conditioned_ot_lambda_max=0.01, drug_conditioned_ot_temperature=5.0, drug_conditioned_ot_threshold='mean', drug_conditioned_ot_detach_gap=True, drug_conditioned_ot_normalize_gap=True, drug_conditioned_ot_ema_gap=True, drug_conditioned_ot_ema_momentum=0.9, drug_conditioned_ot_fixed_lambda=None, use_program_ot=False, program_ot_mode='same_program_uniform', lambda_program_ot=0.01, program_ot_reg=0.1, program_ot_max_iter=50, program_ot_cost_type='cosine', program_ot_marginal_type='uniform', program_ot_detach_q_marginal=True, program_ot_q_temperature=1.0, program_ot_q_power=1.0, program_ot_min_mass=1e-06, q_align_enabled=False, lambda_q_align=0.001, enable_grad_diagnostics=False, grad_diag_every=50, K=3, use_dspi=True, dspi_temperature=1.0, dspi_inter_weight=0.5, dspi_q_prior_weight=0.2, dspi_drug_sim_temperature=1.0, dspi_rho_mode='fixed', dspi_fixed_rho=0.1, dspi_rho_max=0.3, lambda_dspi_attn_diversity=0.0, lambda_dspi_attn_entropy=0.0, lambda_dspi_program_balance=0.0, lambda_dspi_gram_consistency=0.0, backbone_type='convnext1d', norm_type='layernorm', num_gene_tokens=64, token_dim=64, convnext_depth=1, convnext_kernel_size=7, convnext_expansion=4, retrain_flag=True, norm_flag=True)
+########################################################################################################
+pretrain_num_epochs_300_train_num_epochs_100_contrastive_num_epochs_200_K_3_dspi_iw0.5_qprior0.2
+======================= stage 1 (MMPA Program) =======================
+s_dataloaders, t_dataloaders has been created
+Epoch [50/300]
+Train Loss: 0.2200, Train Acc: 0.9641
+Source Domain - Train Acc: 0.9606, Test Acc: 0.6364
+Target Domain - Train Acc: 0.5722, Test Acc: 0.5616
+Epoch [100/300]
+Train Loss: 0.0330, Train Acc: 0.9991
+Source Domain - Train Acc: 1.0000, Test Acc: 0.7380
+Target Domain - Train Acc: 0.7076, Test Acc: 0.6974
+Epoch [150/300]
+Train Loss: 0.0287, Train Acc: 0.9965
+Source Domain - Train Acc: 1.0000, Test Acc: 0.7246
+Target Domain - Train Acc: 0.7145, Test Acc: 0.7035
+Epoch [200/300]
+Train Loss: 0.0327, Train Acc: 0.9965
+Source Domain - Train Acc: 1.0000, Test Acc: 0.7460
+Target Domain - Train Acc: 0.7188, Test Acc: 0.7104
+Epoch [250/300]
+Train Loss: 0.0287, Train Acc: 0.9974
+Source Domain - Train Acc: 1.0000, Test Acc: 0.7380
+Target Domain - Train Acc: 0.6351, Test Acc: 0.6277
+Epoch [300/300]
+Train Loss: 0.0184, Train Acc: 0.9983
+Source Domain - Train Acc: 0.9878, Test Acc: 0.6791
+Target Domain - Train Acc: 0.6407, Test Acc: 0.6297
+======================= stage 2 & 3 (MMPA Program) =======================
+Dataset Fold: 0
+============================================================
+Effective training parameters:
+  effective_alpha = 0.3
+  effective_beta = 0.3
+  effective_topk_contrastive = 3
+  effective_lambda_ot = 0.005
+  effective_ot_mode = global
+  drug_conditioned_ot_enabled = False
+  drug_conditioned_ot_mode = global
+  drug_conditioned_ot_replace_sample_ot = False
+============================================================
+fusion_training_program (MMPA Stage 2, use_drug_gate=False, gate_mode=additive_bias, use_ot=True)
+test-avg (TCGA) metrics (auc,aupr,f1,acc): [0.5659 0.7151 0.4401 0.3347]
+
+Dataset Fold: 1
+============================================================
+Effective training parameters:
+  effective_alpha = 0.3
+  effective_beta = 0.3
+  effective_topk_contrastive = 3
+  effective_lambda_ot = 0.005
+  effective_ot_mode = global
+  drug_conditioned_ot_enabled = False
+  drug_conditioned_ot_mode = global
+  drug_conditioned_ot_replace_sample_ot = False
+============================================================
+fusion_training_program (MMPA Stage 2, use_drug_gate=False, gate_mode=additive_bias, use_ot=True)
+test-avg (TCGA) metrics (auc,aupr,f1,acc): [0.61   0.7375 0.5185 0.4361]
+
+Dataset Fold: 2
+============================================================
+Effective training parameters:
+  effective_alpha = 0.3
+  effective_beta = 0.3
+  effective_topk_contrastive = 3
+  effective_lambda_ot = 0.005
+  effective_ot_mode = global
+  drug_conditioned_ot_enabled = False
+  drug_conditioned_ot_mode = global
+  drug_conditioned_ot_replace_sample_ot = False
+============================================================
+fusion_training_program (MMPA Stage 2, use_drug_gate=False, gate_mode=additive_bias, use_ot=True)
+test-avg (TCGA) metrics (auc,aupr,f1,acc): [0.5171 0.6773 0.4733 0.3838]
+
+Dataset Fold: 3
+============================================================
+Effective training parameters:
+  effective_alpha = 0.3
+  effective_beta = 0.3
+  effective_topk_contrastive = 3
+  effective_lambda_ot = 0.005
+  effective_ot_mode = global
+  drug_conditioned_ot_enabled = False
+  drug_conditioned_ot_mode = global
+  drug_conditioned_ot_replace_sample_ot = False
+============================================================
+fusion_training_program (MMPA Stage 2, use_drug_gate=False, gate_mode=additive_bias, use_ot=True)
+test-avg (TCGA) metrics (auc,aupr,f1,acc): [0.5898 0.7279 0.4986 0.4057]
+
+Dataset Fold: 4
+============================================================
+Effective training parameters:
+  effective_alpha = 0.3
+  effective_beta = 0.3
+  effective_topk_contrastive = 3
+  effective_lambda_ot = 0.005
+  effective_ot_mode = global
+  drug_conditioned_ot_enabled = False
+  drug_conditioned_ot_mode = global
+  drug_conditioned_ot_replace_sample_ot = False
+============================================================
+fusion_training_program (MMPA Stage 2, use_drug_gate=False, gate_mode=additive_bias, use_ot=True)
+test-avg (TCGA) metrics (auc,aupr,f1,acc): [0.5764 0.7084 0.5028 0.4057]
+
+5-fold average/std results: 
+5-Fluorouracil    auc: 0.5442/0.0674 | aupr: 0.6754/0.0445 | f1: 0.4627/0.0666 | acc: 0.3076/0.1817
+Cisplatin         auc: 0.6140/0.0605 | aupr: 0.7792/0.0326 | f1: 0.5007/0.0749 | acc: 0.5388/0.1092
+Cyclophosphamide  auc: 0.5664/0.0516 | aupr: 0.9261/0.0116 | f1: 0.3141/0.1152 | acc: 0.3967/0.1658
+Docetaxel         auc: 0.5002/0.0474 | aupr: 0.6801/0.0266 | f1: 0.3987/0.0262 | acc: 0.3709/0.0483
+Doxorubicin       auc: 0.5022/0.0486 | aupr: 0.7603/0.0270 | f1: 0.3799/0.0476 | acc: 0.3679/0.0744
+Etoposide         auc: 0.7372/0.0858 | aupr: 0.9282/0.0340 | f1: 0.5750/0.1159 | acc: 0.6664/0.1160
+Gemcitabine       auc: 0.5951/0.0350 | aupr: 0.5996/0.0385 | f1: 0.5817/0.0178 | acc: 0.4270/0.0892
+Paclitaxel        auc: 0.4778/0.0203 | aupr: 0.6813/0.0156 | f1: 0.4342/0.0240 | acc: 0.4527/0.0427
+Temozolomide      auc: 0.6096/0.1457 | aupr: 0.3893/0.1263 | f1: 0.7328/0.0178 | acc: 0.0108/0.0242
+4 metrics average/std results: 5-Fluorouracil: 0.4975/0.1672 | Cisplatin: 0.6082/0.1292 | Cyclophosphamide: 0.5508/0.2594 | Docetaxel: 0.4875/0.1293 | Doxorubicin: 0.5026/0.1688 | Etoposide: 0.7267/0.1587 | Gemcitabine: 0.5508/0.0880 | Paclitaxel: 0.5115/0.1049 | Temozolomide: 0.4356/0.2954
+auc&aupr average/std results: 5-Fluorouracil: 0.6098/0.0877 | Cisplatin: 0.6966/0.0984 | Cyclophosphamide: 0.7462/0.1928 | Docetaxel: 0.5901/0.1015 | Doxorubicin: 0.6312/0.1410 | Etoposide: 0.8327/0.1180 | Gemcitabine: 0.5973/0.0348 | Paclitaxel: 0.5796/0.1086 | Temozolomide: 0.4994/0.1732
+auc：0.5719/0.0996  aupr：0.7133/0.1645  acc：0.3932/0.1961  f1：0.4867/0.1359
+all_metrics：0.5412/0.1919
+auc_aupr_metrics：0.6426/0.1519

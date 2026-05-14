@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Logs - too many experiment logs
+logs/
+*.log
+
+# Results - generated experiment outputs
+results/
+outputs/
+
+# Numpy features (generated)
+*.npy
+
+# Checkpoints
+*.pt
+*.pth
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*.restored
