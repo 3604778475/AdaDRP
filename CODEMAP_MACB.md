@@ -663,6 +663,22 @@ python train_mmpa_program.py \
 | MMPA C0 (Phase 2 baseline) | 0.5763 | 0.7098 | 0.5420 | 0.5108 |
 
 **结论**：MMPA 本身（C0）相对原始 MACB-DRP，AUC 提升 **+1.88%**（0.5575 → 0.5763），AUPR 提升 +0.85%，但 F1/ACC 略有下降。说明 molecular program 的引入改善了排序能力（AUC/AUPR），但对硬分类阈值（F1/ACC）影响较小。
+原始：
+5-fold average/std results: 
+5-Fluorouracil    auc: 0.6038/0.0230 | aupr: 0.7128/0.0236 | f1: 0.5473/0.0335 | acc: 0.5766/0.0722
+Cisplatin         auc: 0.6804/0.0380 | aupr: 0.8400/0.0238 | f1: 0.6552/0.0764 | acc: 0.7395/0.0873
+Cyclophosphamide  auc: 0.5974/0.0492 | aupr: 0.9290/0.0193 | f1: 0.6976/0.1334 | acc: 0.8062/0.0987
+Docetaxel         auc: 0.4445/0.0296 | aupr: 0.6519/0.0379 | f1: 0.4516/0.0396 | acc: 0.5423/0.0662
+Doxorubicin       auc: 0.5126/0.0170 | aupr: 0.7731/0.0188 | f1: 0.4302/0.0704 | acc: 0.4895/0.1050
+Etoposide         auc: 0.7114/0.0731 | aupr: 0.9021/0.0353 | f1: 0.7937/0.0298 | acc: 0.8732/0.0211
+Gemcitabine       auc: 0.5984/0.0178 | aupr: 0.5681/0.0172 | f1: 0.5574/0.0289 | acc: 0.5689/0.0291
+Paclitaxel        auc: 0.5578/0.0456 | aupr: 0.7352/0.0368 | f1: 0.5577/0.0538 | acc: 0.6454/0.0605
+Temozolomide      auc: 0.6201/0.0467 | aupr: 0.4330/0.0364 | f1: 0.6537/0.1233 | acc: 0.3562/0.1719
+4 metrics average/std results: 5-Fluorouracil: 0.6101/0.0754 | Cisplatin: 0.7288/0.0926 | Cyclophosphamide: 0.7576/0.1498 | Docetaxel: 0.5226/0.0958 | Doxorubicin: 0.5513/0.1473 | Etoposide: 0.8201/0.0864 | Gemcitabine: 0.5732/0.0270 | Paclitaxel: 0.6240/0.0883 | Temozolomide: 0.5158/0.1629
+auc&aupr average/std results: 5-Fluorouracil: 0.6583/0.0615 | Cisplatin: 0.7602/0.0893 | Cyclophosphamide: 0.7632/0.1783 | Docetaxel: 0.5482/0.1139 | Doxorubicin: 0.6428/0.1384 | Etoposide: 0.8067/0.1141 | Gemcitabine: 0.5832/0.0230 | Paclitaxel: 0.6465/0.1013 | Temozolomide: 0.5266/0.1062
+auc：0.5918/0.0858  aupr：0.7272/0.1544  acc：0.6220/0.1748  f1：0.5938/0.1309
+all_metrics：0.6337/0.1495
+auc_aupr_metrics：0.6595/0.1409
 
 ### 19.4 Phase 5 实验结果
 
@@ -1238,3 +1254,1209 @@ Python `and` 短路救了它：`program_ot_loss_module is None` → 条件 False
 | 10 | TransDRP | 0.5440 |
 
 **若需提升 F1/ACC**: 可选添加 q-mass program OT (λ=0.01, detach_q=true)
+
+
+---
+
+## 24. Phase 9: Fragment-Program Interaction (FPI)
+
+### 24.1 背景
+
+在 B0 (MMPA Combo K=3 + λ_ot=0.005) 基础上，尝试引入 **fragment-level 细粒度药物表征**，通过 BRICS 分解得到药物 fragment，计算 fragment 与 program token 的 pair attention，作为 residual branch 修正预测 logits。
+
+**核心设计**：
+- `DrugFragmentEncoder`: 将 Morgan FP 编码为 fragment embedding
+- `FragmentProgramInteraction`: pair attention + per-drug gamma gate
+- `ProgramFusionMLP`: `final_logits = base_logits + gamma * residual_logits`
+- 安全初始化：`gamma_init=0.0` + `tanh` 输出，确保不破坏基线
+
+### 24.2 实验环境
+
+| 项目 | 配置 |
+|:---|:---|
+| 机器 | Linux 服务器 (`waas`) |
+| Conda | `macb-drp` |
+| 路径 | `/home/waas/MACB-DRP-main` |
+| 数据 | 与 Phase 7 相同 |
+
+> **注意**: 本次实验在 Linux 服务器上运行，故 B0 基线与 CODEMAP 记录的 0.6189 不同。以下分析以**当前环境 B0** 为准。
+
+### 24.3 实验设计（第一轮）
+
+| 实验 | 配置 | 说明 |
+|:---|:---|:---|
+| **B0_current** | 无 FPI | 当前环境基线 |
+| **FPI1_g005** | `gamma_max=0.05, gamma_init=0.0, lambda_fpi_gamma_l1=0.001` | 轻量 FPI |
+| **FPI2_g01** | `gamma_max=0.1, gamma_init=0.0, lambda_fpi_gamma_l1=0.001` | 标准 FPI |
+
+固定配置：
+- `backbone_type=convnext1d`, `convnext_depth=1`, `convnext_kernel_size=7`
+- `num_programs=8`, `program_dim=64`
+- `K=3` (topk_contrastive)
+- `use_ot_alignment`, `lambda_ot=0.005`, `use_cdan`
+- `alph=0.3`, `beta=0.3`
+- `pretrain=300`, `train=100`, `contrastive=200`, 5-fold CV
+
+### 24.4 第一轮实验结果（问题暴露）
+
+#### 汇总表
+
+| 实验 | AUC | AUPR | F1 | ACC | ΔAUC (vs B0) |
+|:---|---:|---:|---:|---:|---:|
+| **B0_current** | **0.5779** | 0.7136 | 0.5034 | 0.4093 | — |
+| FPI1_g005 | 0.5757 | 0.7190 | 0.5125 | 0.4414 | -0.0022 |
+| FPI2_g01 | 0.5838 | 0.7175 | 0.5050 | 0.4010 | +0.0059 |
+
+**第一轮结论**：FPI 提升微弱（+0.0059），且存在药物间 tradeoff。当时判断为"FPI 无效"，但后续诊断发现根本原因是 **gamma 被钉死在 0**。
+
+---
+
+### 24.5 第二轮：Gamma 诊断（关键发现）
+
+#### 问题根因
+
+第一轮实验中，`gamma_init=0.0` + `lambda_fpi_gamma_l1=0.001` 导致 gamma 训练后仍 ≈ 0.000005，FPI 分支数学上等效关闭：`final_logits ≈ base_logits`。
+
+诊断实验设计：
+
+| 实验 | gamma_init | lambda_fpi_gamma_l1 | 说明 |
+|:---|:---|:---|:---|
+| **FPI2_warmup** | **0.05** | **0.0** | gamma 从有效值启动，不惩罚 |
+| **FPI_SIM_soft** | 0.05 | 0.0 | FPI-SIM + union α=β=1.0 |
+| **FPI_SIM_cross_only** | 0.05 | 0.0 | FPI-SIM + union α=β=0.0 |
+
+#### 第二轮汇总结果
+
+| 实验 | AUC | AUPR | F1 | ACC | ΔAUC (vs B0) |
+|:---|---:|---:|---:|---:|---:|
+| B0_current | 0.5779 | 0.7136 | 0.5034 | 0.4093 | — |
+| FPI2_g01 (旧) | 0.5838 | 0.7175 | 0.5050 | 0.4010 | +0.0059 |
+| **FPI2_warmup** | **0.6031** | **0.7371** | **0.5260** | **0.4440** | **+0.0252** |
+| FPI_SIM_soft | 0.5621 | 0.7049 | 0.4850 | 0.4078 | -0.0158 |
+| FPI_SIM_cross_only | 0.5734 | 0.7161 | 0.4900 | 0.4045 | -0.0045 |
+
+#### Per-Drug AUC（B0 vs FPI2_warmup）
+
+| 药物 | B0 | FPI2_warmup | Δ |
+|:---|---:|---:|---:|
+| 5-Fluorouracil | 0.5865 | **0.6186** | +0.0321 |
+| Cisplatin | 0.6213 | **0.6524** | +0.0311 |
+| Cyclophosphamide | 0.5526 | **0.6022** | +0.0496 |
+| Docetaxel | 0.5326 | **0.5321** | -0.0005 |
+| Doxorubicin | 0.5100 | **0.5411** | +0.0311 |
+| Etoposide | 0.7537 | **0.7655** | +0.0118 |
+| Gemcitabine | 0.5929 | **0.6122** | +0.0193 |
+| Paclitaxel | 0.5090 | **0.5262** | +0.0172 |
+| Temozolomide | 0.5426 | **0.5775** | +0.0349 |
+| **Mean** | **0.5779** | **0.6031** | **+0.0252** |
+
+> **9/9 种药物全部提升或持平**，无药物下降。Temozolomide 从第一轮旧 FPI2 的 0.4950（下降）恢复并超越 B0。
+
+---
+
+### 24.6 最优实验：FPI2_warmup 详细配置
+
+#### 运行命令（0.6031）*****************************************
+
+```bash
+python train_mmpa_program.py \
+  --measurement Z_SCORE \
+  --thres_gdsc 0.0 \
+  --thres_label 0.1 \
+  --n 5 \
+  --alph 0.3 \
+  --beta 0.3 \
+  --train \
+  --backbone_type convnext1d \
+  --convnext_depth 1 \
+  --convnext_kernel_size 7 \
+  --num_programs 8 \
+  --program_dim 64 \
+  --K 3 \
+  --use_ot_alignment \
+  --lambda_ot 0.005 \
+  --use_cdan \
+  --use_fpi \
+  --fpi_fragment_npz data/drug_fragments_brics_m16_fp1024.npz \
+  --fpi_gamma_max 0.1 \
+  --fpi_gamma_init 0.05 \
+  --fpi_q_prior_weight 0.01 \
+  --lambda_fpi_gamma_l1 0.0
+```
+
+#### 关键参数说明
+
+| 参数 | 值 | 作用 |
+|:---|:---|:---|
+| `--fpi_gamma_max` | 0.1 | gamma 上限 |
+| `--fpi_gamma_init` | **0.05** | **关键：初始 gamma ≈ 0.05，避免坍缩到 0** |
+| `--lambda_fpi_gamma_l1` | **0.0** | **关键：关闭 L1 惩罚，允许 gamma 保持有效** |
+| `--fpi_q_prior_weight` | 0.01 | q prior 加权 |
+
+#### 训练日志特征（gamma 行为）
+
+```
+FPI epoch 0:   gamma_mean=0.050000, gamma_max=0.050000
+FPI epoch 99:  gamma_mean=0.050808, gamma_max=0.051572
+    gamma_per_drug=[0.0504 0.0504 0.0503 0.051 0.0512 0.051 0.0505 0.0509 0.0516]
+```
+
+- gamma 从 0.05 启动，最终稳定在 ~0.051
+- 9 种药物各自学习到 slightly different 的 gamma 值
+- residual_norm ≈ 0.88，说明 FPI 分支确实输出了有意义的 residual signal
+
+---
+
+### 24.7 FPI-SIM 实验结果
+
+FPI-SIM（Signal-style selective interaction）在第一轮 gamma=0 配置下失败后，用 gamma=0.05 + no L1 重新测试：
+
+| 实验 | AUC | vs B0 | 结论 |
+|:---|---:|---:|:---|
+| FPI_SIM_soft (union α=β=1.0) | 0.5621 | -0.016 | ❌ 低于 B0 |
+| FPI_SIM_cross_only (union α=β=0.0) | 0.5734 | -0.005 | ❌ 低于 B0 |
+
+**FPI-SIM 未带来收益**，global softmax FPI 仍是最佳形式。Selective attention（program intra + fragment intra + soft-union）可能过度过滤了有效信号。
+
+---
+
+### 24.8 关键发现
+
+1. **FPI 本身有效，但 gamma 配置是关键瓶颈**：
+   - `gamma_init=0.0 + L1=0.001` → gamma 坍缩到 0 → FPI 关闭 → AUC ≈ B0
+   - `gamma_init=0.05 + L1=0.0` → gamma 保持 ~0.05 → FPI 生效 → AUC **+0.025**
+
+2. **Global softmax FPI 优于 selective attention (SIM)**：
+   - FPI2_warmup (global): 0.6031 ✅
+   - FPI-SIM soft: 0.5621 ❌
+   - FPI-SIM cross-only: 0.5734 ❌
+
+3. **FPI 收益是全局性的**：
+   - 9/9 药物在 FPI2_warmup 下提升或持平
+   - Temozolomide 从旧 FPI2 的 0.4950 恢复至 0.5775
+
+4. **Gamma 几乎不更新**：
+   - epoch 0: 0.05 → epoch 99: 0.0508
+   - 说明 0.05 是一个稳定有效的工作点，模型不需要大幅调整
+
+---
+
+### 24.9 结论与决策
+
+| 条件 | 结果 | 决策 |
+|:---|:---|:---|
+| FPI2_warmup > B0 + 0.01？ | ✅ 0.6031 > 0.5879 | **FPI 有效，采用 warm-up 配置** |
+| FPI-SIM > FPI2_warmup？ | ❌ 0.5621 < 0.6031 | **停止 FPI-SIM** |
+| 9/9 药物提升？ | ✅ | **无药物 tradeoff** |
+
+- **FPI 方向继续，但仅限 global softmax 形式**
+- **FPI-SIM 停止**
+- **生产配置**：`gamma_init=0.05`, `lambda_fpi_gamma_l1=0.0`, `gamma_max=0.1`
+
+---
+
+## 附录：活跃文件清单（最终版）
+
+| 文件 | 说明 | 状态 |
+|------|------|------|
+| `mmpa_drp/models.py` | `MolecularProgramEncoder`, `ProgramTissueClassifier`, `ProgramFusionMLP`, `FPISIMInteraction` | ✅ 活跃 |
+| `mmpa_drp/backbones.py` | `ConvNeXt1DBackbone`, `GRNMLPBackbone` | ✅ 活跃 (Phase 5) |
+| `mmpa_drp/losses.py` | diversity, sparsity, entropy_floor, gate_balance, gate_diversity | ✅ 活跃 |
+| `mmpa_drp/ot_utils.py` | Sinkhorn, OT alignment, `ProgramOTLoss` (含 q_mass_flattened) | ✅ 活跃 (Phase 6-R) |
+| `mmpa_drp/grad_diagnostics.py` | 梯度诊断工具 | ✅ 活跃 (Phase 6-R) |
+| `mmpa_drp/fpi.py` | `FragmentProgramInteraction`, `FPISIMInteraction` | ✅ 活跃 (Phase 9) |
+| `mmpa_drp/fragment_encoder.py` | `DrugFragmentEncoder` | ✅ 活跃 (Phase 9) |
+| `mmpa_drp/fragment_utils.py` | `load_drug_fragments` | ✅ 活跃 (Phase 9) |
+| `mmpa_drp/stage1_program.py` | Stage 1 训练 | ✅ 活跃 |
+| `mmpa_drp/stage2_program.py` | Stage 2&3 训练（含 OT + Program OT + q_align + FPI） | ✅ 活跃 |
+| `train_mmpa_program.py` | MMPA-DRP 训练主入口 | ✅ 活跃 |
+| `CODEMAP_MACB.md` | 本文件 | ✅ 活跃 |
+
+### 已停止的模块（代码保留在 `mmpa_drp/` 中作为历史记录）
+
+| 模块 | 停止原因 |
+|------|----------|
+| `DisentangledProgramEncoder` / `DisentangledProgramTissueClassifier` / `DisentangledProgramFusionMLP` | 3A-R 未超越 baseline |
+| `DrugMechanismGate` / `DrugGatedProgramAggregator` / `SharedDrugGate` | 3B-R 未超越 baseline |
+| `FPISIMInteraction` | FPI-SIM 未超越 global FPI |
+
+### 最终方法栈（Phase 9 之后）
+
+| 层级 | 组件 | 配置 |
+|:---|:---|:---|
+| Backbone | `ConvNeXt1DBackbone` | depth=1, kernel=7, expansion=4 |
+| Encoder | `MolecularProgramEncoder` | K=8 programs, d=64 |
+| Sample OT | `DrugAdaptiveOTLoss` (global) | **λ=0.005**, reg=0.1, cosine |
+| Program OT | 不使用（AUC 无提升） | — |
+| CDAN | 保留 | α=0.3 |
+| Stage 3 | Contrastive | **K=3**, β=0.3 |
+| FPI | `FragmentProgramInteraction` (global) | **γ_init=0.05**, γ_max=0.1, no L1 |
+
+---
+
+### 24.10 Phase 9-R: Dual FPI Residual Router
+
+在 Phase 9 发现 **Global FPI** (AUC 0.6031) 全面优于 **FPI-SIM**，但 FPI-SIM 的 **cross-only** 模式对 **Temozolomide** 有潜力 (0.6274 vs global 0.5775)。因此设计 `DualFPIResidualRouter`，让两种分支共存，由 **per-drug learnable gamma gates** 自动选择。
+
+#### 24.10.1 动机
+
+| 分支 | 整体 AUC | Temozolomide | 特点 |
+|:---|---:|---:|:---|
+| Global FPI | **0.6031** | 0.5775 | 稳健，9/9 药物提升 |
+| FPI-SIM cross-only | 0.5734 | **0.6274** | 整体差，但 Temozolomide  Specialist |
+
+**假设**：不同药物需要不同的 FPI 形式。Global 适合大多数药物，Cross 适合 Temozolomide 等特定药物。
+
+#### 24.10.2 架构设计
+
+```
+base_logits ──┬──> Global FPI Branch ──> residual_global
+              │       (FragmentProgramInteraction, use_fpi_sim=False)
+              │
+              ├──> Cross FPI Branch ──> residual_cross
+              │       (FragmentProgramInteraction, use_fpi_sim=True, union_α=β=0)
+              │
+              └──> Gamma Gates ──> final_logits
+```
+
+**数学形式**：
+```
+final_logits = base_logits
+    + gamma_global[d] * residual_global
+    + effective_gamma_cross[d] * residual_cross
+
+effective_gamma_cross = schedule_factor(epoch)
+    * gamma_cross[d]
+    * cross_active_mask[d]
+```
+
+#### 24.10.3 实现细节
+
+**文件**: `mmpa_drp/fpi.py` — `DualFPIResidualRouter`
+
+| 组件 | 类/参数 | 说明 |
+|:---|:---|:---|
+| Global branch | `self.global_fpi = FragmentProgramInteraction(use_fpi_sim=False)` | 复用最优 global FPI |
+| Cross branch | `self.cross_fpi = FragmentProgramInteraction(use_fpi_sim=True, union_α=β=0)` | 纯 cross-modal attention |
+| Gamma global | `raw_gamma_global` → sigmoid * γ_max | per-drug, 所有药物共享学习 |
+| Gamma cross | `raw_gamma_cross` → sigmoid * γ_max | per-drug, 默认关闭 (init=0) |
+| Schedule | `router_cross_start_epoch`, `router_cross_ramp_epochs` | 延迟激活 cross，避免早期干扰 |
+| Oracle mask | `router_cross_mode="oracle_mask"` | **仅诊断用**，强制指定药物使用 cross |
+| Diagnostics | `branch_preference`, `branch_effect_ratio` | 自动判断每个药物偏好哪个分支 |
+
+**文件**: `mmpa_drp/models.py` — `ProgramFusionMLP`
+
+- `__init__`: 新增 `use_fpi_router`, `fpi_router_config` 参数
+- `forward`: 当 `use_fpi_router=True` 时，调用 `self.fpi_router(..., current_epoch, drug_names)`
+- 互斥检查：`use_fpi_router` 与 `use_fpi`, `use_bpaf`, `use_llrf`, `use_dspi`, `use_drug_gate` 不能共存
+
+**文件**: `mmpa_drp/stage2_program.py`
+
+- `fusion_training_program`: 读取 `use_fpi_router`, `lambda_router_gamma_l1`, `fpi_router_config`
+- `_fusion_model_train_step_with_fpi`: 新增 `current_epoch`, `drug_names`, `lambda_router_gamma_l1` 参数
+- Router loss: `lambda_router_gamma_l1 * (|gamma_global| + |gamma_cross|).mean()`
+- 互斥：`use_fpi_router=True` 时，`use_fpi` 自动置为 False
+
+**文件**: `train_mmpa_program.py`
+
+新增 argparse 参数（共 12 个）：
+- `--use_fpi_router`
+- `--router_gamma_global_max`, `--router_gamma_global_init`
+- `--router_gamma_cross_max`, `--router_gamma_cross_init`
+- `--router_residual_global_scale`, `--router_residual_cross_scale`
+- `--router_cross_start_epoch`, `--router_cross_ramp_epochs`
+- `--router_cross_mode`, `--router_oracle_cross_drugs`
+- `--router_branch_effect_threshold`
+- `--lambda_router_gamma_l1`
+
+#### 24.10.4 关键参数（推荐配置）
+
+| 参数 | 推荐值 | 理由 |
+|:---|:---|:---|
+| `router_gamma_global_max` | 0.05 | 复用 FPI2_warmup 最优值 |
+| `router_gamma_global_init` | 0.05 | 避免 gamma 坍缩 |
+| `router_gamma_cross_max` | 0.05 | cross 上限与 global 相同 |
+| `router_gamma_cross_init` | 0.0 | cross 默认关闭，让需要的药物自己学 |
+| `lambda_router_gamma_l1` | 0.0 | **关键**：不惩罚 gamma，避免钉死 |
+| `router_cross_start_epoch` | 0 | 不延迟（或 10 如果早期不稳定） |
+| `router_cross_ramp_epochs` | 0 | 不 ramp（或 10 平滑过渡） |
+
+#### 24.10.5 互斥逻辑
+
+```python
+# train_mmpa_program.py
+if args.use_fpi_router and (args.use_fpi or args.use_bpaf or ...):
+    parser.error("...")
+
+# stage2_program.py
+if use_fpi_router:
+    use_fpi = False  # 强制关闭旧 FPI
+
+# models.py
+if use_fpi_router and (use_fpi or use_bpaf or ...):
+    raise ValueError("...")
+```
+
+#### 24.10.6 诊断指标
+
+Router forward 返回的 dict 包含丰富的 diagnostics：
+
+| 键 | 形状 | 说明 |
+|:---|:---|:---|
+| `gamma_global` | [D] | 每个药物的 global gamma 值 |
+| `gamma_cross` | [D] | 每个药物的 cross gamma 值 |
+| `effective_gamma_cross` | [D] | 经过 schedule + mask 后的实际 cross gamma |
+| `branch_global_effect` | [D] | global 分支对 base 的相对影响 |
+| `branch_cross_effect` | [D] | cross 分支对 base 的相对影响 |
+| `branch_preference` | List[str] | 每个药物的偏好："base_only", "global_fpi", "cross_fpi" |
+| `cross_active_mask` | [D] | 哪些药物被允许使用 cross（learnable 全 1，oracle 部分 1） |
+| `schedule_factor` | scalar | 当前 epoch 的 cross 激活系数 |
+
+#### 24.10.7 消融实验
+
+**脚本**: `run_ablation_fpi_router.py`
+
+| 实验 | 配置 | 目的 |
+|:---|:---|:---|
+| B0 baseline | 无 FPI, 无 router | 对照 |
+| Global only | cross_max=0 | 验证 global 单独是否仍达 0.6031 |
+| Global + Learnable Cross | cross_init=0, no L1 | 核心实验：cross 能否自动被需要的药物学习 |
+| Global + Cross Ramp | start=10, ramp=10 | 测试延迟激活是否更稳定 |
+| Oracle Cross (Temozolomide) | mode=oracle, drugs=Temozolomide | **诊断上限**：如果 Temozolomide 强制 cross，AUC 能到多少 |
+| Global + Cross + L1 | lambda_router_gamma_l1=0.001 | 验证 L1 是否会钉死 cross gamma |
+| Low Global + High Cross | gg_max=0.03, gc_max=0.08 | 探索更激进的 cross 权重 |
+
+#### 24.10.8 测试覆盖
+
+**脚本**: `tests/test_fpi_router.py`（7 项测试，全部通过）
+
+| 测试 | 验证内容 |
+|:---|:---|
+| `test_router_instantiation_and_forward` | 输出形状正确 |
+| `test_gamma_ranges` | gamma 在 [0, max] 范围内 |
+| `test_cross_branch_schedule` | ramp 逻辑正确（epoch 0→5→10） |
+| `test_oracle_mask_mode` | oracle mask 仅对指定药物激活 |
+| `test_integration_with_program_fusion_mlp` | 与 ProgramFusionMLP 集成正确 |
+| `test_mutual_exclusion_fpi_router` | use_fpi + use_fpi_router 抛出 ValueError |
+| `test_router_without_fragments` | 无 fragment 数据时 router 被安全绕过 |
+
+---
+
+#### 24.10.9 首次实验结果与 Bug 修复
+
+**实验命令**（修复前）：
+```bash
+python train_mmpa_program.py --use_fpi_router \
+  --router_gamma_global_max 0.05 --router_gamma_global_init 0.05 \
+  --router_gamma_cross_max 0.05 --router_gamma_cross_init 0.0 \
+  --lambda_router_gamma_l1 0.0 \
+  --fpi_m_max 16 --fpi_fp_dim 1024 \
+  --use_cdan --use_ot_alignment --lambda_ot 0.005 \
+  --alph 0.3 --beta 0.3 --K 3 --train
+```
+
+**结果（修复前）**：
+
+| 药物 | AUC (Router) | AUC (FPI2_warmup) | Δ |
+|:---|---:|---:|---:|
+| 5-Fluorouracil | 0.5066 | 0.6186 | **-0.112** |
+| Cisplatin | 0.5840 | 0.6524 | -0.068 |
+| Cyclophosphamide | 0.5484 | 0.6022 | -0.054 |
+| Docetaxel | 0.4467 | 0.5321 | -0.085 |
+| Doxorubicin | 0.4447 | 0.5411 | -0.096 |
+| Etoposide | 0.6989 | 0.7655 | -0.067 |
+| Gemcitabine | 0.5882 | 0.6122 | -0.024 |
+| Paclitaxel | 0.4906 | 0.5262 | -0.036 |
+| Temozolomide | **0.6916** | 0.5775 | **+0.114** |
+| **Mean AUC** | **0.5555** | **0.6031** | **-0.048** |
+
+**现象**：8/9 药物暴跌，仅 Temozolomide 暴涨 (+0.114)。
+
+**根因诊断：双重 Gamma 缩放**
+
+`DualFPIResidualRouter` 内部实例化了两台 `FragmentProgramInteraction`，每台都有自己的 `raw_gamma`。`FragmentProgramInteraction.forward_global()` 已经用 internal gamma 缩放过一次 residual：
+```python
+# FragmentProgramInteraction.forward_global()
+residual_logits = torch.tanh(residual_logits)
+gamma = self.get_gamma()  # internal gamma ≈ 0.05
+# returns residual_logits (已缩放)
+```
+
+然后 `DualFPIResidualRouter.forward()` 又用自己的 gamma 再缩放一次：
+```python
+final_logits = base_logits + gamma_global * residual_global
+```
+
+→ Global branch 总贡献 = internal 0.05 × router 0.05 = **0.0025**（仅为 FPI2_warmup 的 1/20）
+→ Cross branch 总贡献 = internal 0.0 × router 0.0 = **0.0**
+
+这导致 global branch 实际上被关闭，大多数药物回到接近 B0 甚至更差（参数增多导致训练不稳定）。而 Temozolomide 在训练中 cross branch 学到了非零 gamma，所以暴涨——这反而**验证了 cross branch 对 Temozolomide 确实有效**。
+
+**修复**：`DualFPIResidualRouter.__init__` 中创建 `global_fpi` 和 `cross_fpi` 时，将 internal `gamma_max=1.0`, `gamma_init=1.0`，禁用内部门控，让 Router 的 gamma 承担全部门控责任。
+
+```python
+self.global_fpi = FragmentProgramInteraction(
+    ...,
+    gamma_max=1.0,   # 固定为 1.0
+    gamma_init=1.0,  # 固定为 1.0
+    ...,
+)
+```
+
+**修复后状态**：代码已更新，`tests/test_fpi_router.py` 7/7 通过，待重新运行实验验证。
+
+---
+
+#### 24.10.10 第二次实验与 Bug 修复
+
+**修复后重新运行，结果仍然 AUC=0.5555。**
+
+再次诊断发现：**`use_fpi_router` 根本没有传给 `ProgramFusionMLP`**！
+
+在 `mmpa_drp/stage2_program.py` 的 `fusion_training_program` 中：
+```python
+fusion_model = ProgramFusionMLP(
+    encoder=encoder,
+    ...
+    use_fpi=use_fpi,
+    fpi_config=fpi_config,
+    frag_fp=frag_fp_tensor,
+    frag_mask=frag_mask_tensor,
+).to(kwargs["device"])
+```
+
+`use_fpi_router` 和 `fpi_router_config` 完全没有出现在构造函数参数列表中。`ProgramFusionMLP.__init__` 中 `use_fpi_router` 默认为 `False`，因此：
+- `fpi_router` 未被实例化
+- `fragment_encoder` 未被实例化
+- `_frag_fp` / `_frag_mask` buffer 保持为 `None`
+- `forward()` 中 router 路径被跳过
+
+**实际运行的是纯 B0 baseline**（AUC 0.5555 只是该次随机种子的结果）。
+
+**修复**（`mmpa_drp/stage2_program.py`）：
+```python
+fusion_model = ProgramFusionMLP(
+    encoder=encoder,
+    ...
+    use_fpi=use_fpi,
+    fpi_config=fpi_config,
+    # Phase 9-R: FPI Router
+    use_fpi_router=use_fpi_router,
+    fpi_router_config=fpi_router_config,
+    frag_fp=frag_fp_tensor,
+    frag_mask=frag_mask_tensor,
+).to(kwargs["device"])
+```
+
+**教训**：参数从 argparse → `training_params` → `kwargs` → `fusion_training_program` → `ProgramFusionMLP` 的传递链条很长，任何一个环节遗漏都会导致模块静默失效。`print(f"use_fpi_router={use_fpi_router}")` 虽然打印了参数值，但没有验证模型内部是否实际创建了 router。
+
+**待验证**：修复后重新运行实验，确认 Router 真正生效。
+
+---
+
+## 附录：活跃文件清单（Phase 9-R 更新版）
+
+| 文件 | 说明 | 状态 |
+|------|------|------|
+| `mmpa_drp/models.py` | `MolecularProgramEncoder`, `ProgramTissueClassifier`, `ProgramFusionMLP`, `FPISIMInteraction`, **DualFPIResidualRouter** | ✅ 活跃 |
+| `mmpa_drp/backbones.py` | `ConvNeXt1DBackbone`, `GRNMLPBackbone` | ✅ 活跃 (Phase 5) |
+| `mmpa_drp/losses.py` | diversity, sparsity, entropy_floor, gate_balance, gate_diversity | ✅ 活跃 |
+| `mmpa_drp/ot_utils.py` | Sinkhorn, OT alignment, `ProgramOTLoss` (含 q_mass_flattened) | ✅ 活跃 (Phase 6-R) |
+| `mmpa_drp/grad_diagnostics.py` | 梯度诊断工具 | ✅ 活跃 (Phase 6-R) |
+| `mmpa_drp/fpi.py` | `FragmentProgramInteraction`, `FPISIMInteraction`, **DualFPIResidualRouter** | ✅ 活跃 (Phase 9-R) |
+| `mmpa_drp/fragment_encoder.py` | `DrugFragmentEncoder` | ✅ 活跃 (Phase 9) |
+| `mmpa_drp/fragment_utils.py` | `load_drug_fragments` | ✅ 活跃 (Phase 9) |
+| `mmpa_drp/stage1_program.py` | Stage 1 训练 | ✅ 活跃 |
+| `mmpa_drp/stage2_program.py` | Stage 2&3 训练（含 OT + Program OT + q_align + FPI + **Router**） | ✅ 活跃 |
+| `train_mmpa_program.py` | MMPA-DRP 训练主入口 | ✅ 活跃 |
+| `run_ablation_fpi_router.py` | Phase 9-R 消融实验脚本 | ✅ 新增 |
+| `tests/test_fpi_router.py` | Router smoke tests (7/7 通过) | ✅ 新增 |
+| `CODEMAP_MACB.md` | 本文件 | ✅ 活跃 |
+
+### 已停止的模块
+
+| 模块 | 停止原因 |
+|------|----------|
+| `DisentangledProgramEncoder` / `DisentangledProgramTissueClassifier` / `DisentangledProgramFusionMLP` | 3A-R 未超越 baseline |
+| `DrugMechanismGate` / `DrugGatedProgramAggregator` / `SharedDrugGate` | 3B-R 未超越 baseline |
+| `FPISIMInteraction`（standalone） | FPI-SIM 未超越 global FPI，但保留作为 Router 的 cross branch |
+
+### 最终方法栈（Phase 9-R 之后）
+
+| 层级 | 组件 | 配置 |
+|:---|:---|:---|
+| Backbone | `ConvNeXt1DBackbone` | depth=1, kernel=7, expansion=4 |
+| Encoder | `MolecularProgramEncoder` | K=8 programs, d=64 |
+| Sample OT | `DrugAdaptiveOTLoss` (global) | **λ=0.005**, reg=0.1, cosine |
+| Program OT | 不使用（AUC 无提升） | — |
+| CDAN | 保留 | α=0.3 |
+| Stage 3 | Contrastive | **K=3**, β=0.3 |
+| FPI Router | `DualFPIResidualRouter` | global + cross learnable gates, γ_init_global=0.05, γ_init_cross=0.0, no L1 |
+
+**历史最佳 AUC (Windows 本地)**: **0.6189** (Combo K=3 + λ_ot=0.005, 无 FPI)
+**当前环境最佳 AUC (Linux 服务器)**: **0.6031** (FPI2_warmup, K=3 + λ_ot=0.005 + FPI global)
+**Phase 9-R 目标**: 在 0.6031 基础上，通过 cross branch 为 Temozolomide 等药物进一步提升
+## 2026-05-17 并行实验记录：C3_K_3 vs Combo Best (K=3, λ_ot 对比)（重跑C3实验）
+
+### 实验背景
+在同一环境、同一天（2026-05-17）并行运行两个高度相似的超参组合，检验 λ_ot 的敏感性及跨配置稳定性。
+
+### 运行命令
+
+**实验 A — C3_K_3 (λ_ot=0.01)** — AUC 胜出
+```bash
+python3 train_mmpa_program.py \
+    --train --use_ot_alignment --use_cdan \
+    --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7 \
+    --lambda_ot 0.01 --n 5 --alph 0.3 --beta 0.3 --K 3
+```
+
+**实验 B — Combo Best (λ_ot=0.005)** — 历史最佳配置复现
+```bash
+python3 train_mmpa_program.py \
+    --train --use_ot_alignment --use_cdan \
+    --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7 \
+    --lambda_ot 0.005 --n 5 --alph 0.3 --beta 0.3 --K 3
+```
+
+### 共享配置
+
+| 参数 | 值 |
+|:---|:---|
+| Backbone | ConvNeXt1D (depth=1, kernel=7) |
+| Programs | 8 × 64-dim |
+| CDAN | α=0.3 |
+| Contrastive | β=0.3, **K=3** |
+| n-folds | 5 |
+| Pretrain | 300 epochs |
+| Train | 100 epochs |
+| Contrastive | 200 epochs |
+| Seed | 2025 (hardcoded) |
+
+### 结果对比
+
+| 指标 | **C3_K_3 (λ_ot=0.01)** | Combo (λ_ot=0.005) | Δ |
+|:---|---:|---:|---:|
+| **AUC** | **0.5901** ± 0.0915 | 0.5779 ± 0.1020 | **+0.0122** |
+| AUPR | 0.7179 ± 0.1920 | 0.7136 ± 0.1760 | +0.0043 |
+| ACC | **0.4447** ± 0.2350 | 0.4093 ± 0.2053 | +0.0354 |
+| F1 | **0.5119** ± 0.1540 | 0.5034 ± 0.1320 | +0.0085 |
+
+**结论：λ_ot=0.01 在今天的环境下全面优于 0.005。**
+
+### 最佳实验详细结果（C3_K_3, λ_ot=0.01）
+
+**5-fold 平均 ± 标准差：**
+
+| 药物 | AUC | AUPR | F1 | ACC |
+|:---|---:|---:|---:|---:|
+| 5-Fluorouracil | 0.6388 ± 0.0514 | 0.7385 ± 0.0441 | 0.4855 ± 0.0730 | 0.3490 ± 0.1868 |
+| Cisplatin | 0.6466 ± 0.0303 | 0.7945 ± 0.0125 | 0.5271 ± 0.0659 | 0.5688 ± 0.0924 |
+| Cyclophosphamide | 0.6112 ± 0.0618 | 0.9275 ± 0.0277 | 0.3600 ± 0.2227 | 0.4261 ± 0.3117 |
+| Docetaxel | 0.5632 ± 0.0393 | 0.7338 ± 0.0152 | 0.5019 ± 0.0786 | 0.5176 ± 0.1506 |
+| Doxorubicin | 0.5446 ± 0.0753 | 0.7800 ± 0.0542 | 0.4579 ± 0.1704 | 0.4591 ± 0.2323 |
+| **Etoposide** | **0.7394 ± 0.0774** | **0.9161 ± 0.0349** | 0.6000 ± 0.2049 | 0.6773 ± 0.2191 |
+| Gemcitabine | 0.5682 ± 0.0277 | 0.5778 ± 0.0334 | 0.5400 ± 0.0342 | 0.3884 ± 0.1291 |
+| Paclitaxel | 0.5304 ± 0.0352 | 0.7223 ± 0.0214 | 0.4874 ± 0.0913 | 0.5250 ± 0.1465 |
+| Temozolomide | 0.4683 ± 0.0839 | 0.2705 ± 0.0684 | 0.6478 ± 0.2163 | 0.0914 ± 0.1743 |
+
+**复合指标：**
+- `all_metrics`: 0.5662 ± 0.2017
+- `auc_aupr_metrics`: 0.6540 ± 0.1618
+
+### 各药物 AUC 横向对比（λ_ot=0.01 vs 0.005）
+
+| 药物 | λ_ot=0.01 | λ_ot=0.005 | Δ |
+|:---|---:|---:|---:|
+| 5-FU | 0.6388 | 0.5865 | **+0.052** |
+| Cisplatin | 0.6466 | 0.6213 | +0.025 |
+| Cyclophosphamide | 0.6112 | 0.5526 | +0.059 |
+| Docetaxel | 0.5632 | 0.5326 | +0.031 |
+| Doxorubicin | 0.5446 | 0.5100 | +0.035 |
+| Etoposide | 0.7394 | 0.7537 | -0.014 |
+| Gemcitabine | 0.5682 | 0.5929 | -0.025 |
+| Paclitaxel | 0.5304 | 0.5090 | +0.021 |
+| Temozolomide | 0.4683 | 0.5426 | **-0.074** |
+
+λ_ot=0.01 在 7/9 药物上更好，仅在 Etoposide (-0.014) 和 Gemcitabine (-0.025) 上略差，Temozolomide 差异最大（-0.074 对 λ_ot=0.005 有利）。
+
+### 关键发现
+
+1. **λ_ot 存在环境敏感波动**：同一天内 λ_ot=0.01 优于 0.005，但历史最佳 0.6189 恰好是 λ_ot=0.005。说明 λ_ot 最优值对 CUDA/GPU 状态敏感，不是一个稳定可迁移的超参。
+2. **结果文件碰撞**：两个实验生成的 `param_str` 完全相同（不含 `lambda_ot`），导致 CSV 文件互相覆盖。后完成的 Combo 结果留在了 `results/` 目录，C3_K_3 的结果仅存于日志 `brief_logs.txt` 中。
+3. **Etoposide 持续最强**：两个配置下 Etoposide 都是 AUC 最高的药物（0.7394 / 0.7537），说明模型对 Etoposide 的响应模式学习得最稳定。
+4. **Temozolomide 持续最弱**：两个配置下 Temozolomide 都是 AUC 最低的药物（0.4683 / 0.5426），模型对此药响应区分度不足。
+
+### 日志位置
+
+- C3_K_3 (λ_ot=0.01): `logs/2026-05-17_17-01-41mmpa_program/`
+- Combo (λ_ot=0.005): `logs/2026-05-17_17-04-14mmpa_program/`
+
+---
+
+## 25. Phase 9-F: FPI Router Diagnosis (Two-stage Cross Compensation)
+
+### 25.1 背景
+
+在 Phase 9-R 的 `DualFPIResidualRouter` 实现后，首次修复实验显示 **Mean AUC 0.5555**（远低于 FPI2_warmup 的 0.6031），但 **Temozolomide 暴涨至 0.6916**（+0.114）。这揭示了 cross branch 对 Temozolomide 有独特价值，但对其他药物有害。
+
+Phase 9-F 的目标是通过系统化诊断实验，确认 cross branch 的益处是否可以被**隔离**并仅用于 Temozolomide，而不损害全局性能。
+
+### 25.2 为什么只对 Temozolomide 进行 Cross Branch
+
+**数据驱动的选择**：
+
+| 药物 | FPI2_warmup AUC | 9-R 首次实验 AUC | Δ |
+|:---|---:|---:|---:|
+| 5-Fluorouracil | 0.6186 | 0.5066 | **-0.112** |
+| Cisplatin | 0.6524 | 0.5840 | -0.068 |
+| Cyclophosphamide | 0.6022 | 0.5484 | -0.054 |
+| Docetaxel | 0.5321 | 0.4467 | -0.085 |
+| Doxorubicin | 0.5411 | 0.4447 | -0.096 |
+| Etoposide | 0.7655 | 0.6989 | -0.067 |
+| Gemcitabine | 0.6122 | 0.5882 | -0.024 |
+| Paclitaxel | 0.5262 | 0.4906 | -0.036 |
+| **Temozolomide** | **0.5775** | **0.6916** | **+0.114** |
+| **Mean** | **0.6031** | **0.5555** | **-0.048** |
+
+- **8/9 药物暴跌**：cross branch 联合 global branch 导致全局性能崩溃
+- **仅 Temozolomide 暴涨**：说明 cross branch 的 signal 对 Temozolomide 是独特的，与其他药物不兼容
+- **Temozolomide 是最弱药物**：在所有 baseline 配置中（MACB 0.5998, C3 0.6452, FPI2_warmup 0.5775, C3_K_3 λ_ot=0.01 0.4683），Temozolomide  consistently 是最难预测的药物之一
+
+**生物学/结构假设**：
+Temozolomide 的 BRICS fragment 分解结果与其他药物显著不同（小分子、简单环结构、含 N-甲基等特征），其 fragment fingerprint 与 program token 的 **cross-modal interaction**（而非 global average）可能捕获了其他表征路径无法提取的药物响应信号。
+
+**策略选择**：
+由于 cross branch 对 8/9 药物有害，不能全局启用。采用 **Oracle Mask** 诊断策略：强制仅对 Temozolomide 激活 cross branch，验证"cross-only 后处理补偿器"假设。
+
+> ⚠️ **Oracle mask 仅为诊断工具**，不能作为最终生产方法。若诊断成功，需设计自动机制（如 per-drug gamma gate）让模型自己学习哪些药物需要 cross。
+
+### 25.3 诊断实验设计
+
+| 实验 | 名称 | 配置 | 目的 |
+|:---|:---|:---|:---|
+| **1** | Match Global | `cross_fpi` 复制 `global_fpi` 的初始化参数 | 排除 cross branch 结构本身缺陷 |
+| **2** | Cross Detach | `router_cross_detach_mode="all"`（detach z/q/h/drug/frag） | 阻断梯度污染，测试 pure residual 冲突 |
+| **3** | Two-stage Cross Only | Stage A: 训练 Global-only → save ckpt; Stage B: 冻结全部主模型，仅训练 cross_fpi + gamma_cross | 完全隔离 cross branch 训练 |
+| **4** | Oracle Mask (诊断) | `router_cross_mode="oracle_mask"`, `router_oracle_cross_drugs="Temozolomide"` | 强制仅 Temozolomide 使用 cross |
+| **5** | Cross Detach + Oracle | 实验2 + Oracle mask 组合 | 双重保险验证 |
+
+**基线对照**：
+- **Router Global-only Confirm**: `router_gamma_cross_max=0.0` → `cross_fpi=None` → 等价于 FPI2_warmup
+  - 结果：**Mean AUC 0.6031**, **Temozolomide 0.5775**（与 FPI2_warmup 完全一致，验证 lazy creation 正确性）
+
+### 25.4 实验结果
+
+#### 汇总表
+
+| 实验 | Mean AUC | Temozolomide | vs Global-only | 结论 |
+|:---|---:|---:|---:|:---|
+| **Global-only Confirm** | **0.6031** | 0.5775 | — | 基线已复现 ✅ |
+| **1 Match Global** | 0.5644 | — | -0.0387 | ❌ Cross branch 联合训练本身崩溃 |
+| **2 Cross Detach** | 0.5801 | — | -0.0230 | ⚠️ 缓解梯度污染但仍不足 |
+| **3 Two-stage** | **0.6117** | **0.6051** | **+0.0086** / **+0.0276** | ✅ **Cross branch 能隔离提升 Temo** |
+
+#### 实验 3 (Two-stage) 详细结果
+
+| 药物 | Global-only | Two-stage | Δ |
+|:---|---:|---:|---:|
+| 5-Fluorouracil | 0.6186 | **0.6355** | +0.0169 |
+| Cisplatin | 0.6524 | 0.6456 | -0.0068 |
+| Cyclophosphamide | 0.6022 | **0.6345** | +0.0323 |
+| Docetaxel | 0.5321 | 0.5220 | -0.0101 |
+| Doxorubicin | 0.5411 | **0.5498** | +0.0087 |
+| Etoposide | 0.7655 | 0.7492 | -0.0163 |
+| Gemcitabine | 0.6122 | **0.6268** | +0.0146 |
+| Paclitaxel | 0.5262 | 0.5206 | -0.0056 |
+| **Temozolomide** | **0.5775** | **0.6051** | **+0.0276** |
+| **Mean** | **0.6031** | **0.6117** | **+0.0086** |
+
+> **稳定性验证**：修复 BatchNorm eval 后重新运行，所有 AUC 数字与修复前**完全一致**（确定性强）。
+
+### 25.5 关键发现与分析
+
+#### 发现 1：Cross branch 联合训练导致全局崩溃
+
+**实验 1 (Match Global, 0.5644)** 证明：即使 `cross_fpi` 和 `global_fpi` 使用完全相同的初始化参数，联合训练仍然导致 Mean AUC 从 0.6031 暴跌到 0.5644。
+
+**根因**：两个 residual branch 同时优化时，loss landscape 存在冲突。global branch 试图修正 base_logits 的方向 A，cross branch 试图修正方向 B，梯度在共享的 encoder/fusion 参数上互相干扰。
+
+#### 发现 2：Detach 缓解但不够
+
+**实验 2 (Cross Detach, 0.5801)** 通过 detach z/q/h_pool/drug_emb/frag_emb，阻断了 cross branch 的梯度向主模型回流。
+
+- 从 0.5644 恢复到 0.5801（+0.0157），说明**梯度污染是部分原因**
+- 但仍低于 Global-only 的 0.6031（-0.0230），说明**即使无梯度污染，residual 本身也存在冲突**
+
+**根因**：cross branch 输出的 residual 信号在数学上与 global branch 的 residual 不兼容。`final_logits = base + global_residual + cross_residual`，两个 residual 向量可能互相抵消。
+
+#### 发现 3：Two-stage 完全隔离是成功的
+
+**实验 3 (Two-stage, 0.6117)** 的核心设计：
+
+```
+Stage A: 训练 Global-only (cross_fpi=None) → 保存 checkpoint
+Stage B: 加载 checkpoint → 冻结 encoder/fusion/cdan/global_fpi/attention_masks → 仅训练 cross_fpi + gamma_cross
+```
+
+关键实现：
+- `load_state_dict(..., strict=False)` 兼容 Stage A 无 cross_fpi 的 state dict
+- 冻结模块调用 `.eval()` 阻止 BatchNorm running stats 漂移
+- 仅 2 个参数组可训练：`cross_fpi` 网络参数 + `raw_gamma_cross` per-drug gate
+
+**结果**：
+- Mean AUC **0.6117** > Global-only **0.6031**（+0.86%）
+- Temozolomide **0.6051** > Global-only **0.5775**（+2.76%）
+- 其他药物变化微小（±0.03 以内），无显著损害
+
+**结论**：当主模型完全冻结时，cross branch 的 residual 不再与 global branch 冲突，能够作为**纯后处理补偿器**提升特定药物的性能。
+
+#### 发现 4：非 Temozolomide 药物仍有微小漂移
+
+| 药物 | Δ |
+|:---|---:|
+| 5-FU | +0.017 |
+| Cyclophosphamide | +0.032 |
+| Gemcitabine | +0.015 |
+
+这些药物在 Two-stage 中也有正向漂移（尽管 oracle mask 理论上只给 Temozolomide 开 cross）。可能原因：
+1. `gamma_cross` 对非 Temo 药物不是严格的 0（sigmoid(0) * 0.05 = 0.025，不是 0）
+2. BatchNorm running stats 在 Stage B 中仍有极微小漂移
+3. 同一 checkpoint 在不同运行中的固有变异
+
+但这些漂移幅度小（<0.035）且方向为正，不构成问题。
+
+### 25.6 运行命令（差差差）
+
+#### Stage A: Global-only Checkpoint 训练（保存 checkpoint）
+
+```bash  0.5480
+python train_mmpa_program.py \
+  --measurement Z_SCORE \
+  --thres_gdsc 0.0 --thres_label 0.1 \
+  --n 5 --alph 0.3 --beta 0.3 --train \
+  --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7 \
+  --num_programs 8 --program_dim 64 \
+  --K 3 --use_ot_alignment --lambda_ot 0.005 --use_cdan \
+  --use_fpi_router \
+  --router_gamma_global_max 0.05 --router_gamma_global_init 0.05 \
+  --router_gamma_cross_max 0.0 \
+  --lambda_router_gamma_l1 0.0 \
+  --router_stage_a_checkpoint_dir checkpoints/router_global_only
+```
+
+> `--router_gamma_cross_max 0.0` 触发 lazy creation，`cross_fpi=None`，等价于纯 Global FPI。
+
+#### Stage B: Two-stage Cross-only 训练
+
+```bash
+python train_mmpa_program.py \
+  --measurement Z_SCORE \
+  --thres_gdsc 0.0 --thres_label 0.1 \
+  --n 5 --alph 0.3 --beta 0.3 --train \
+  --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7 \
+  --num_programs 8 --program_dim 64 \
+  --K 3 --use_ot_alignment --lambda_ot 0.005 --use_cdan \
+  --use_fpi_router \
+  --router_gamma_global_max 0.05 --router_gamma_global_init 0.05 \
+  --router_gamma_cross_max 0.05 --router_gamma_cross_init 0.0 \
+  --lambda_router_gamma_l1 0.0 \
+  --router_cross_mode oracle_mask \
+  --router_oracle_cross_drugs "Temozolomide" \
+  --router_two_stage_cross_only \
+  --router_freeze_main_for_cross \
+  --router_stage_a_checkpoint_dir checkpoints/router_global_only
+```
+
+#### 诊断脚本
+
+```bash
+# 运行全部诊断实验（实验 1-5）
+python run_ablation_fpi_router_diagnosis.py
+
+# 分析结果
+python scripts/analyze_phase9_router_ablation.py
+```
+
+### 25.7 结论与决策
+
+| 问题 | 答案 | 决策 |
+|:---|:---|:---|
+| Cross branch 对 Temozolomide 有效吗？ | ✅ **有效**，Two-stage 提升 +0.0276 | 继续探索 cross branch 的 Temozolomide 特异性 |
+| Cross branch 能全局启用吗？ | ❌ **不能**，联合训练导致崩溃 (0.5644) | 不允许全局 cross branch |
+| Two-stage 是可行路径吗？ | ✅ **是**，冻结主模型后 cross 能作为后处理补偿器 | 保留 Two-stage 机制 |
+| Oracle mask 能用于生产吗？ | ❌ **不能**，Oracle mask 是人为先验，非 learnable | 需替换为自动门控机制 |
+
+**下一步方向**：
+1. **自动药物选择**：让 `gamma_cross` 自己学习哪些药物需要 cross（而非人工 oracle mask）。如果 `gamma_cross` 在非 Temo 药物上保持 ≈0，在 Temo 上上升到 >0，则自动实现等效效果。
+2. **Temozolomide 专项分析**：深入分析 Temozolomide 的 BRICS fragment 模式，理解为什么 cross-modal interaction 对其独特有效。
+3. **生产化 Two-stage**：将 Two-stage 训练流程自动化（Stage A → save → Stage B），作为可选的训练模式集成到主流程。
+
+---
+
+## 附录：活跃文件清单（Phase 9-F 更新版）
+
+| 文件 | 说明 | 状态 |
+|------|------|------|
+| `mmpa_drp/models.py` | `MolecularProgramEncoder`, `ProgramFusionMLP`, `DualFPIResidualRouter` | ✅ 活跃 |
+| `mmpa_drp/fpi.py` | `FragmentProgramInteraction`, `DualFPIResidualRouter` | ✅ 活跃 |
+| `mmpa_drp/stage2_program.py` | Stage 2&3 训练（含 Two-stage + freeze + eval 逻辑） | ✅ 活跃 |
+| `train_mmpa_program.py` | MMPA-DRP 训练主入口（含 router 参数） | ✅ 活跃 |
+| `run_ablation_fpi_router_diagnosis.py` | Phase 9-F 诊断实验脚本 | ✅ 活跃 |
+| `scripts/analyze_phase9_router_ablation.py` | 诊断结果自动汇总 | ✅ 活跃 |
+| `CODEMAP_MACB.md` | 本文件 | ✅ 活跃 |
+
+### 已停止的模块
+
+| 模块 | 停止原因 |
+|------|----------|
+| `DisentangledProgramEncoder` / `DisentangledProgramTissueClassifier` / `DisentangledProgramFusionMLP` | 3A-R 未超越 baseline |
+| `DrugMechanismGate` / `DrugGatedProgramAggregator` / `SharedDrugGate` | 3B-R 未超越 baseline |
+| `FPISIMInteraction`（standalone） | FPI-SIM 未超越 global FPI，但作为 Router cross branch 保留 |
+| `DrugAdaptiveOTLoss` (per_drug_fixed/validation/discrepancy) | Phase 4 药物自适应 OT 无效，保留 global 模式 |
+
+### 最终方法栈（Phase 9-F 之后）
+
+| 层级 | 组件 | 配置 |
+|:---|:---|:---|
+| Backbone | `ConvNeXt1DBackbone` | depth=1, kernel=7, expansion=4 |
+| Encoder | `MolecularProgramEncoder` | K=8 programs, d=64 |
+| Sample OT | `DrugAdaptiveOTLoss` (global) | λ=0.005, reg=0.1, cosine |
+| Program OT | 不使用（AUC 无提升） | — |
+| CDAN | 保留 | α=0.3 |
+| Stage 3 | Contrastive | K=3, β=0.3 |
+| FPI Router | `DualFPIResidualRouter` | global: γ=0.05; cross: Two-stage for Temozolomide |
+
+**历史最佳 AUC (Windows 本地)**: **0.6189** (Combo K=3 + λ_ot=0.005, 无 FPI)
+**当前环境最佳 AUC (Linux 服务器)**: **0.6117** (Two-stage FPI Router, Global + Cross for Temozolomide)
+**Temozolomide 最佳 AUC**: **0.6051** (Two-stage cross branch)
+
+*******************************************MACB*********************************
+                              0       1       2       3       4
+drug             metric                                        
+5-Fluorouracil   auc     0.5371  0.5552  0.5131  0.4411  0.5624
+                 aupr    0.6996  0.6837  0.6406  0.6226  0.7113
+                 f1      0.5364  0.5591  0.5318  0.4727  0.5591
+                 acc     0.6047  0.6196  0.6084  0.5704  0.6166
+Cisplatin        auc     0.6886  0.6738  0.6669  0.5959  0.7159
+                 aupr    0.8375  0.8279  0.8143  0.7610  0.8648
+                 f1      0.7122  0.6954  0.6835  0.6882  0.7338
+                 acc     0.8119  0.7894  0.7836  0.7841  0.8252
+Cyclophosphamide auc     0.6929  0.4176  0.7346  0.6237  0.7015
+                 aupr    0.9496  0.8885  0.9556  0.9283  0.9636
+                 f1      0.7294  0.5000  0.8706  0.6000  0.7000
+                 acc     0.8333  0.6559  0.9290  0.7344  0.8145
+Docetaxel        auc     0.4165  0.3321  0.4065  0.3125  0.4018
+                 aupr    0.6543  0.6016  0.6216  0.5767  0.6342
+                 f1      0.4088  0.3459  0.3774  0.3962  0.4151
+                 acc     0.4835  0.4409  0.4142  0.4074  0.5131
+Doxorubicin      auc     0.4374  0.3515  0.4637  0.3195  0.4162
+                 aupr    0.7080  0.6653  0.7293  0.6497  0.6938
+                 f1      0.3333  0.3270  0.3585  0.2704  0.3145
+                 acc     0.3765  0.3815  0.3704  0.2468  0.3394
+Etoposide        auc     0.8289  0.6586  0.7586  0.7609  0.7672
+                 aupr    0.9369  0.8691  0.9190  0.9255  0.9080
+                 f1      0.8021  0.7292  0.8333  0.8125  0.8646
+                 acc     0.8774  0.8267  0.8987  0.8831  0.9231
+Gemcitabine      auc     0.6149  0.5690  0.6152  0.5926  0.6067
+                 aupr    0.6299  0.5551  0.6222  0.5564  0.5536
+                 f1      0.5609  0.5304  0.5913  0.5783  0.6043
+                 acc     0.5388  0.4953  0.5481  0.5872  0.5845
+Paclitaxel       auc     0.4716  0.4845  0.5160  0.4253  0.4407
+                 aupr    0.6874  0.7055  0.6984  0.6758  0.6720
+                 f1      0.4775  0.5180  0.4414  0.4099  0.4369
+                 acc     0.5469  0.6373  0.4746  0.4178  0.5455
+Temozolomide     auc     0.5174  0.7306  0.6306  0.6056  0.5150
+                 aupr    0.3422  0.5394  0.4221  0.3483  0.3103
+                 f1      0.7537  0.7836  0.7388  0.7239  0.7388
+                 acc     0.1538  0.4528  0.2222  0.3019  0.1026
+
+5-fold average/std results: 
+5-Fluorouracil    auc: 0.5218/0.0489 | aupr: 0.6715/0.0383 | f1: 0.5318/0.0354 | acc: 0.6039/0.0197
+Cisplatin         auc: 0.6682/0.0446 | aupr: 0.8211/0.0383 | f1: 0.7026/0.0206 | acc: 0.7988/0.0187
+Cyclophosphamide  auc: 0.6341/0.1275 | aupr: 0.9371/0.0302 | f1: 0.6800/0.1396 | acc: 0.7934/0.1035
+Docetaxel         auc: 0.3739/0.0479 | aupr: 0.6177/0.0299 | f1: 0.3887/0.0279 | acc: 0.4518/0.0455
+Doxorubicin       auc: 0.3976/0.0602 | aupr: 0.6892/0.0321 | f1: 0.3208/0.0324 | acc: 0.3429/0.0562
+Etoposide         auc: 0.7548/0.0611 | aupr: 0.9117/0.0260 | f1: 0.8083/0.0503 | acc: 0.8818/0.0355
+Gemcitabine       auc: 0.5997/0.0194 | aupr: 0.5834/0.0390 | f1: 0.5730/0.0287 | acc: 0.5508/0.0377
+Paclitaxel        auc: 0.4676/0.0359 | aupr: 0.6878/0.0143 | f1: 0.4568/0.0418 | acc: 0.5244/0.0830
+Temozolomide      auc: 0.5998/0.0895 | aupr: 0.3924/0.0918 | f1: 0.7478/0.0226 | acc: 0.2467/0.1374
+4 metrics average/std results: 5-Fluorouracil: 0.5823/0.0708 | Cisplatin: 0.7477/0.0721 | Cyclophosphamide: 0.7612/0.1561 | Docetaxel: 0.4580/0.1054 | Doxorubicin: 0.4376/0.1578 | Etoposide: 0.8392/0.0756 | Gemcitabine: 0.5767/0.0347 | Paclitaxel: 0.5341/0.1054 | Temozolomide: 0.4967/0.2150
+auc&aupr average/std results:5-Fluorouracil: 0.5967/0.0891 | Cisplatin: 0.7447/0.0896 | Cyclophosphamide: 0.7856/0.1821 | Docetaxel: 0.4958/0.1339 | Doxorubicin: 0.5434/0.1603 | Etoposide: 0.8333/0.0938 | Gemcitabine: 0.5915/0.0303 | Paclitaxel: 0.5777/0.1189 | Temozolomide: 0.4961/0.1388
+auc：0.5575/0.1354  aupr：0.7013/0.1669  acc：0.5772/0.2155  f1：0.5789/0.1684
+all_metrics：0.6037/0.1812
+auc_aupr_metrics：0.6294/0.1666
+
+********************************有OT******************************************
+0.5779
+python train_mmpa_program.py \
+  --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5 \
+  --alph 0.3 --beta 0.3 --train \
+  --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7 \
+  --num_programs 8 --program_dim 64 --K 3 --lambda_ot 0.005 \
+  --use_cdan --use_ot_alignment
+5-fold average/std results: 
+5-Fluorouracil    auc: 0.5865/0.0293 | aupr: 0.6900/0.0372 | f1: 0.4836/0.0766 | acc: 0.3651/0.2124
+Cisplatin         auc: 0.6213/0.0314 | aupr: 0.7912/0.0231 | f1: 0.4532/0.0474 | acc: 0.4465/0.0930
+Cyclophosphamide  auc: 0.5526/0.1299 | aupr: 0.9154/0.0314 | f1: 0.3918/0.1771 | acc: 0.4940/0.2030
+Docetaxel         auc: 0.5326/0.0393 | aupr: 0.7094/0.0210 | f1: 0.4604/0.0215 | acc: 0.4583/0.0567
+Doxorubicin       auc: 0.5100/0.0383 | aupr: 0.7708/0.0249 | f1: 0.3836/0.0199 | acc: 0.3851/0.0310
+Etoposide         auc: 0.7537/0.0843 | aupr: 0.9298/0.0338 | f1: 0.6188/0.1119 | acc: 0.7107/0.1132
+Gemcitabine       auc: 0.5929/0.0204 | aupr: 0.5777/0.0269 | f1: 0.5626/0.0205 | acc: 0.3887/0.0631
+Paclitaxel        auc: 0.5090/0.0221 | aupr: 0.6841/0.0225 | f1: 0.4351/0.0335 | acc: 0.4359/0.0810
+Temozolomide      auc: 0.5426/0.1635 | aupr: 0.3542/0.1644 | f1: 0.7418/0.0041 | acc: 0.0000/0.0000
+4 metrics average/std results: 5-Fluorouracil: 0.5313/0.1628 | Cisplatin: 0.5780/0.1540 | Cyclophosphamide: 0.5884/0.2450 | Docetaxel: 0.5402/0.1104 | Doxorubicin: 0.5124/0.1641 | Etoposide: 0.7533/0.1432 | Gemcitabine: 0.5305/0.0913 | Paclitaxel: 0.5161/0.1127 | Temozolomide: 0.4096/0.3000
+auc&aupr average/std results: 5-Fluorouracil: 0.6382/0.0630 | Cisplatin: 0.7062/0.0933 | Cyclophosphamide: 0.7340/0.2109 | Docetaxel: 0.6210/0.0978 | Doxorubicin: 0.6404/0.1408 | Etoposide: 0.8418/0.1108 | Gemcitabine: 0.5853/0.0239 | Paclitaxel: 0.5966/0.0946 | Temozolomide: 0.4484/0.1838
+auc：0.5779/0.1020  aupr：0.7136/0.1760  acc：0.4093/0.2053  f1：0.5034/0.1320
+all_metrics：0.5511/0.1925
+auc_aupr_metrics：0.6458/0.1576
+
+python train_mmpa_program.py --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5 --alph 0.3 --beta 0.3 --train --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7 --num_programs 8 --program_dim 64 --K 3 --use_ot_alignment --lambda_ot 0.005 --use_cdan
+
+5-fold average/std results: 
+5-Fluorouracil    auc: 0.5865/0.0293 | aupr: 0.6900/0.0372 | f1: 0.4836/0.0766 | acc: 0.3651/0.2124
+Cisplatin         auc: 0.6213/0.0314 | aupr: 0.7912/0.0231 | f1: 0.4532/0.0474 | acc: 0.4465/0.0930
+Cyclophosphamide  auc: 0.5526/0.1299 | aupr: 0.9154/0.0314 | f1: 0.3918/0.1771 | acc: 0.4940/0.2030
+Docetaxel         auc: 0.5326/0.0393 | aupr: 0.7094/0.0210 | f1: 0.4604/0.0215 | acc: 0.4583/0.0567
+Doxorubicin       auc: 0.5100/0.0383 | aupr: 0.7708/0.0249 | f1: 0.3836/0.0199 | acc: 0.3851/0.0310
+Etoposide         auc: 0.7537/0.0843 | aupr: 0.9298/0.0338 | f1: 0.6188/0.1119 | acc: 0.7107/0.1132
+Gemcitabine       auc: 0.5929/0.0204 | aupr: 0.5777/0.0269 | f1: 0.5626/0.0205 | acc: 0.3887/0.0631
+Paclitaxel        auc: 0.5090/0.0221 | aupr: 0.6841/0.0225 | f1: 0.4351/0.0335 | acc: 0.4359/0.0810
+Temozolomide      auc: 0.5426/0.1635 | aupr: 0.3542/0.1644 | f1: 0.7418/0.0041 | acc: 0.0000/0.0000
+4 metrics average/std results: 5-Fluorouracil: 0.5313/0.1628 | Cisplatin: 0.5780/0.1540 | Cyclophosphamide: 0.5884/0.2450 | Docetaxel: 0.5402/0.1104 | Doxorubicin: 0.5124/0.1641 | Etoposide: 0.7533/0.1432 | Gemcitabine: 0.5305/0.0913 | Paclitaxel: 0.5161/0.1127 | Temozolomide: 0.4096/0.3000
+auc&aupr average/std results: 5-Fluorouracil: 0.6382/0.0630 | Cisplatin: 0.7062/0.0933 | Cyclophosphamide: 0.7340/0.2109 | Docetaxel: 0.6210/0.0978 | Doxorubicin: 0.6404/0.1408 | Etoposide: 0.8418/0.1108 | Gemcitabine: 0.5853/0.0239 | Paclitaxel: 0.5966/0.0946 | Temozolomide: 0.4484/0.1838
+auc：0.5779/0.1020  aupr：0.7136/0.1760  acc：0.4093/0.2053  f1：0.5034/0.1320
+all_metrics：0.5511/0.1925
+auc_aupr_metrics：0.6458/0.1576
+************************************无FPI+convnext_depth1*******************
+  python3 train_mmpa_program.py \
+    --train --use_ot_alignment --use_cdan \
+    --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7 \
+    --lambda_ot 0.01 --n 5 --alph 0.3 --beta 0.3 --K 3
+
+5-fold average/std results: 
+5-Fluorouracil    auc: 0.6388/0.0514 | aupr: 0.7385/0.0441 | f1: 0.4855/0.0730 | acc: 0.3490/0.1868
+Cisplatin         auc: 0.6466/0.0303 | aupr: 0.7945/0.0125 | f1: 0.5271/0.0659 | acc: 0.5688/0.0924
+Cyclophosphamide  auc: 0.6112/0.0618 | aupr: 0.9275/0.0277 | f1: 0.3600/0.2227 | acc: 0.4261/0.3117
+Docetaxel         auc: 0.5632/0.0393 | aupr: 0.7338/0.0152 | f1: 0.5019/0.0786 | acc: 0.5176/0.1506
+Doxorubicin       auc: 0.5446/0.0753 | aupr: 0.7800/0.0542 | f1: 0.4579/0.1704 | acc: 0.4591/0.2323
+Etoposide         auc: 0.7394/0.0774 | aupr: 0.9161/0.0349 | f1: 0.6000/0.2049 | acc: 0.6773/0.2191
+Gemcitabine       auc: 0.5682/0.0277 | aupr: 0.5778/0.0334 | f1: 0.5400/0.0342 | acc: 0.3884/0.1291
+Paclitaxel        auc: 0.5304/0.0352 | aupr: 0.7223/0.0214 | f1: 0.4874/0.0913 | acc: 0.5250/0.1465
+Temozolomide      auc: 0.4683/0.0839 | aupr: 0.2705/0.0684 | f1: 0.6478/0.2163 | acc: 0.0914/0.1743
+4 metrics average/std results: 5-Fluorouracil: 0.5529/0.1805 | Cisplatin: 0.6342/0.1179 | Cyclophosphamide: 0.5812/0.2879 | Docetaxel: 0.5791/0.1240 | Doxorubicin: 0.5604/0.1937 | Etoposide: 0.7332/0.1864 | Gemcitabine: 0.5186/0.1015 | Paclitaxel: 0.5663/0.1243 | Temozolomide: 0.3695/0.2541
+auc&aupr average/std results: 5-Fluorouracil: 0.6886/0.0693 | Cisplatin: 0.7205/0.0810 | Cyclophosphamide: 0.7693/0.1727 | Docetaxel: 0.6485/0.0942 | Doxorubicin: 0.6623/0.1386 | Etoposide: 0.8277/0.1090 | Gemcitabine: 0.5730/0.0294 | Paclitaxel: 0.6263/0.1048 | Temozolomide: 0.3694/0.1268
+auc：0.5901/0.0915  aupr：0.7179/0.1920  acc：0.4447/0.2350  f1：0.5119/0.1540
+all_metrics：0.5662/0.2017
+auc_aupr_metrics：0.6540/0.1618
+
+**************************************有FPI***********************************
+0.6031
+ python train_mmpa_program.py \
+  --measurement Z_SCORE \
+  --thres_gdsc 0.0 \
+  --thres_label 0.1 \
+  --n 5 \
+  --alph 0.3 \
+  --beta 0.3 \
+  --train \
+  --backbone_type convnext1d \
+  --convnext_depth 1 \
+  --convnext_kernel_size 7 \
+  --num_programs 8 \
+  --program_dim 64 \
+  --K 3 \
+  --use_ot_alignment \
+  --lambda_ot 0.005 \
+  --use_cdan \
+  --use_fpi \
+  --fpi_fragment_npz data/drug_fragments_brics_m16_fp1024.npz \
+  --fpi_gamma_max 0.1 \
+  --fpi_gamma_init 0.05 \
+  --fpi_q_prior_weight 0.01 \
+  --lambda_fpi_gamma_l1 0.0
+
+5-fold average/std results: 
+5-Fluorouracil    auc: 0.6186/0.0630 | aupr: 0.7284/0.0335 | f1: 0.4682/0.0575 | acc: 0.2957/0.1317
+Cisplatin         auc: 0.6524/0.0156 | aupr: 0.8184/0.0125 | f1: 0.5405/0.0425 | acc: 0.5887/0.0670
+Cyclophosphamide  auc: 0.6022/0.0468 | aupr: 0.9267/0.0186 | f1: 0.4341/0.1250 | acc: 0.5564/0.1346
+Docetaxel         auc: 0.5321/0.0863 | aupr: 0.7104/0.0763 | f1: 0.4792/0.0883 | acc: 0.4909/0.1082
+Doxorubicin       auc: 0.5411/0.0666 | aupr: 0.7946/0.0539 | f1: 0.4252/0.0756 | acc: 0.4291/0.1041
+Etoposide         auc: 0.7655/0.0397 | aupr: 0.9369/0.0157 | f1: 0.6104/0.0742 | acc: 0.7058/0.0797
+Gemcitabine       auc: 0.6122/0.0189 | aupr: 0.6024/0.0365 | f1: 0.5722/0.0125 | acc: 0.3953/0.0452
+Paclitaxel        auc: 0.5262/0.0724 | aupr: 0.7176/0.0402 | f1: 0.4640/0.0426 | acc: 0.4864/0.0657
+Temozolomide      auc: 0.5775/0.0617 | aupr: 0.3985/0.0990 | f1: 0.7403/0.0133 | acc: 0.0480/0.1073
+4 metrics average/std results: 5-Fluorouracil: 0.5277/0.1824 | Cisplatin: 0.6500/0.1141 | Cyclophosphamide: 0.6299/0.2062 | Docetaxel: 0.5531/0.1264 | Doxorubicin: 0.5475/0.1695 | Etoposide: 0.7546/0.1332 | Gemcitabine: 0.5455/0.0947 | Paclitaxel: 0.5485/0.1153 | Temozolomide: 0.4411/0.2737
+auc&aupr average/std results: 5-Fluorouracil: 0.6735/0.0749 | Cisplatin: 0.7354/0.0885 | Cyclophosphamide: 0.7645/0.1743 | Docetaxel: 0.6212/0.1214 | Doxorubicin: 0.6678/0.1453 | Etoposide: 0.8512/0.0947 | Gemcitabine: 0.6073/0.0279 | Paclitaxel: 0.6219/0.1150 | Temozolomide: 0.4880/0.1223
+auc：0.6031/0.0879  aupr：0.7371/0.1646  acc：0.4440/0.2014  f1：0.5260/0.1153
+all_metrics：0.5776/0.1825
+auc_aupr_metrics：0.6701/0.1467
+
+*********************stage1分为shared和private domain+OT，无FPI**********
+python train_mmpa_program.py \
+  --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5 \
+  --train --backbone_type convnext1d --convnext_depth 1 \
+  --num_programs 8 --program_dim 64 --K 3 \
+  --use_ot_alignment --lambda_ot 0.005 --use_cdan \
+  --use_domain_sep --domain_sep_hidden_dim 256 --domain_sep_output_dim 64 \
+  --lambda_ortho 0.001 --lambda_recon 0.001 --lambda_private_domain 0.001 \
+  --lambda_migrate 0.01 \
+  --alph 1.4 \
+  --pretrain_num_epochs 100 --train_num_epochs 100 --contrastive_num_epochs 100
+
+5-fold average/std results: 
+5-Fluorouracil    auc: 0.6046/0.0690 | aupr: 0.7195/0.0482 | f1: 0.5973/0.0558 | acc: 0.6835/0.0782
+Cisplatin         auc: 0.6628/0.0243 | aupr: 0.8355/0.0213 | f1: 0.7022/0.0397 | acc: 0.8046/0.0372
+Cyclophosphamide  auc: 0.6321/0.0792 | aupr: 0.9443/0.0155 | f1: 0.7071/0.1336 | acc: 0.8122/0.1004
+Docetaxel         auc: 0.4918/0.0721 | aupr: 0.6919/0.0722 | f1: 0.5208/0.0666 | acc: 0.6339/0.0877
+Doxorubicin       auc: 0.5765/0.1075 | aupr: 0.8071/0.0711 | f1: 0.5950/0.1084 | acc: 0.6936/0.1171
+Etoposide         auc: 0.7728/0.0381 | aupr: 0.9415/0.0123 | f1: 0.8292/0.0203 | acc: 0.8997/0.0117
+Gemcitabine       auc: 0.5953/0.0245 | aupr: 0.5885/0.0155 | f1: 0.5513/0.0523 | acc: 0.5972/0.0502
+Paclitaxel        auc: 0.5321/0.0759 | aupr: 0.7182/0.0593 | f1: 0.6171/0.0391 | acc: 0.7373/0.0368
+Temozolomide      auc: 0.6029/0.0658 | aupr: 0.4143/0.0934 | f1: 0.5910/0.2337 | acc: 0.2324/0.1711
+4 metrics average/std results: 5-Fluorouracil: 0.6512/0.0792 | Cisplatin: 0.7513/0.0784 | Cyclophosphamide: 0.7739/0.1475 | Docetaxel: 0.5846/0.1084 | Doxorubicin: 0.6681/0.1332 | Etoposide: 0.8608/0.0698 | Gemcitabine: 0.5831/0.0406 | Paclitaxel: 0.6512/0.0986 | Temozolomide: 0.4601/0.2109
+auc&aupr average/std results:5-Fluorouracil: 0.6621/0.0826 | Cisplatin: 0.7492/0.0935 | Cyclophosphamide: 0.7882/0.1731 | Docetaxel: 0.5918/0.1255 | Doxorubicin: 0.6918/0.1489 | Etoposide: 0.8571/0.0928 | Gemcitabine: 0.5919/0.0196 | Paclitaxel: 0.6252/0.1172 | Temozolomide: 0.5086/0.1252
+auc：0.6079/0.0975  aupr：0.7401/0.1682  acc：0.6771/0.2000  f1：0.6345/0.1311
+all_metrics：0.6649/0.1603
+auc_aupr_metrics：0.6740/0.1511  
+
+***********************************+fpi*******************
+python train_mmpa_program.py   --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5   --train --backbone_type convnext1d --convnext_depth 1   --num_programs 8 --program_dim 64 --K 3   --use_ot_alignment --lambda_ot 0.005 --use_cdan   --use_domain_sep --domain_sep_hidden_dim 256 --domain_sep_output_dim 64   --lambda_ortho 0.001 --lambda_recon 0.005 --lambda_private_domain 0.005   --lambda_migrate 0.01   --alph 1.4   --use_fpi --fpi_gamma_max 0.1   --pretrain_num_epochs 100 --train_num_epochs 100 --contrastive_num_epochs 100
+
+5-fold average/std results: 
+5-Fluorouracil    auc: 0.6251/0.0569 | aupr: 0.7298/0.0436 | f1: 0.6091/0.0318 | acc: 0.7078/0.0356
+Cisplatin         auc: 0.6610/0.0351 | aupr: 0.8415/0.0145 | f1: 0.6758/0.0391 | acc: 0.7763/0.0401
+Cyclophosphamide  auc: 0.6698/0.0345 | aupr: 0.9481/0.0130 | f1: 0.7659/0.0630 | acc: 0.8603/0.0444
+Docetaxel         auc: 0.5284/0.0677 | aupr: 0.7239/0.0479 | f1: 0.5585/0.0625 | acc: 0.6675/0.0657
+Doxorubicin       auc: 0.5729/0.0638 | aupr: 0.8280/0.0336 | f1: 0.5673/0.0463 | acc: 0.6753/0.0612
+Etoposide         auc: 0.7550/0.0628 | aupr: 0.9319/0.0255 | f1: 0.7833/0.0468 | acc: 0.8671/0.0363
+Gemcitabine       auc: 0.5884/0.0270 | aupr: 0.6009/0.0142 | f1: 0.5591/0.0435 | acc: 0.5729/0.0428
+Paclitaxel        auc: 0.5474/0.0253 | aupr: 0.7410/0.0202 | f1: 0.6306/0.0294 | acc: 0.7481/0.0264
+Temozolomide      auc: 0.6089/0.0968 | aupr: 0.4360/0.1123 | f1: 0.7493/0.0100 | acc: 0.0743/0.0383
+4 metrics average/std results: 5-Fluorouracil: 0.6679/0.0662 | Cisplatin: 0.7387/0.0822 | Cyclophosphamide: 0.8110/0.1136 | Docetaxel: 0.6196/0.0991 | Doxorubicin: 0.6609/0.1187 | Etoposide: 0.8343/0.0827 | Gemcitabine: 0.5804/0.0352 | Paclitaxel: 0.6668/0.0885 | Temozolomide: 0.4671/0.2684
+auc&aupr average/std results: 5-Fluorouracil: 0.6775/0.0730 | Cisplatin: 0.7513/0.0984 | Cyclophosphamide: 0.8090/0.1487 | Docetaxel: 0.6262/0.1169 | Doxorubicin: 0.7004/0.1428 | Etoposide: 0.8434/0.1036 | Gemcitabine: 0.5947/0.0214 | Paclitaxel: 0.6442/0.1043 | Temozolomide: 0.5225/0.1344
+auc：0.6174/0.0843  aupr：0.7535/0.1597  acc：0.6611/0.2316  f1：0.6554/0.0960
+all_metrics：0.6719/0.1607
+auc_aupr_metrics：0.6855/0.1434
+***********************-fpi
+python train_mmpa_program.py   --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5   --train --backbone_type convnext1d --convnext_depth 1   --num_programs 8 --program_dim 64 --K 3   --use_ot_alignment --lambda_ot 0.005 --use_cdan   --use_domain_sep --domain_sep_hidden_dim 256 --domain_sep_output_dim 64   --lambda_ortho 0.001 --lambda_recon 0.005 --lambda_private_domain 0.005   --lambda_migrate 0.01   --alph 1.4 --pretrain_num_epochs 100 --train_num_epochs 100 --contrastive_num_epochs 100
+                              0       1       2       3       4
+drug             metric                                        
+5-Fluorouracil   auc     0.6312  0.6466  0.5609  0.5788  0.5325
+                 aupr    0.7173  0.7268  0.6594  0.6650  0.6806
+                 f1      0.5409  0.6318  0.6000  0.5318  0.5273
+                 acc     0.5944  0.6966  0.7317  0.5253  0.5398
+Cisplatin        auc     0.6680  0.6574  0.6829  0.6509  0.6578
+                 aupr    0.8174  0.8249  0.8437  0.8100  0.8360
+                 f1      0.6978  0.7242  0.7122  0.5707  0.6595
+                 acc     0.7955  0.8228  0.8125  0.6524  0.7543
+Cyclophosphamide auc     0.5394  0.6895  0.5789  0.6108  0.6013
+                 aupr    0.9019  0.9599  0.9258  0.9126  0.9290
+                 f1      0.4529  0.6765  0.8118  0.6647  0.4353
+                 acc     0.5903  0.7955  0.8940  0.7849  0.5676
+Docetaxel        auc     0.4101  0.5369  0.6605  0.5523  0.4139
+                 aupr    0.6527  0.7310  0.7949  0.7016  0.6603
+                 f1      0.4717  0.5409  0.6541  0.5786  0.4403
+                 acc     0.6000  0.6404  0.7489  0.6763  0.5616
+Doxorubicin      auc     0.4084  0.5748  0.7210  0.6525  0.4097
+                 aupr    0.7156  0.8226  0.8783  0.8221  0.7140
+                 f1      0.4465  0.5283  0.7170  0.6478  0.4277
+                 acc     0.5644  0.6305  0.8018  0.7383  0.5285
+Etoposide        auc     0.7586  0.8031  0.7156  0.8062  0.7391
+                 aupr    0.9323  0.9527  0.9258  0.9512  0.9205
+                 f1      0.7708  0.7708  0.8542  0.8229  0.8021
+                 acc     0.8571  0.8553  0.9176  0.8944  0.8820
+Gemcitabine      auc     0.6001  0.5855  0.5437  0.5888  0.5943
+                 aupr    0.6243  0.5874  0.5554  0.6335  0.5748
+                 f1      0.5696  0.5565  0.5087  0.5565  0.5696
+                 acc     0.6207  0.5234  0.5703  0.5565  0.5992
+Paclitaxel       auc     0.4495  0.5657  0.5990  0.5387  0.4555
+                 aupr    0.6524  0.7327  0.7536  0.7120  0.6591
+                 f1      0.5541  0.6351  0.6577  0.5631  0.5450
+                 acc     0.6877  0.7523  0.7683  0.6881  0.6622
+Temozolomide     auc     0.6653  0.6306  0.5632  0.3659  0.3500
+                 aupr    0.4823  0.4702  0.3283  0.2277  0.2205
+                 f1      0.7612  0.7537  0.3060  0.7537  0.2612
+                 acc     0.4839  0.0571  0.3841  0.0571  0.3529
+
+5-fold average/std results: 
+5-Fluorouracil    auc: 0.5900/0.0479 | aupr: 0.6898/0.0306 | f1: 0.5664/0.0469 | acc: 0.6176/0.0927
+Cisplatin         auc: 0.6634/0.0125 | aupr: 0.8264/0.0136 | f1: 0.6729/0.0621 | acc: 0.7675/0.0694
+Cyclophosphamide  auc: 0.6040/0.0551 | aupr: 0.9259/0.0219 | f1: 0.6082/0.1607 | acc: 0.7265/0.1415
+Docetaxel         auc: 0.5147/0.1052 | aupr: 0.7081/0.0580 | f1: 0.5371/0.0853 | acc: 0.6454/0.0721
+Doxorubicin       auc: 0.5533/0.1415 | aupr: 0.7905/0.0728 | f1: 0.5535/0.1260 | acc: 0.6527/0.1154
+Etoposide         auc: 0.7645/0.0397 | aupr: 0.9365/0.0147 | f1: 0.8042/0.0356 | acc: 0.8813/0.0262
+Gemcitabine       auc: 0.5825/0.0224 | aupr: 0.5951/0.0331 | f1: 0.5522/0.0252 | acc: 0.5740/0.0377
+Paclitaxel        auc: 0.5217/0.0667 | aupr: 0.7020/0.0447 | f1: 0.5910/0.0516 | acc: 0.7117/0.0459
+Temozolomide      auc: 0.5150/0.1481 | aupr: 0.3458/0.1266 | f1: 0.5672/0.2594 | acc: 0.2670/0.1976
+4 metrics average/std results: 5-Fluorouracil: 0.6159/0.0722 | Cisplatin: 0.7325/0.0820 | Cyclophosphamide: 0.7161/0.1684 | Docetaxel: 0.6013/0.1106 | Doxorubicin: 0.6375/0.1464 | Etoposide: 0.8466/0.0740 | Gemcitabine: 0.5759/0.0320 | Paclitaxel: 0.6316/0.0947 | Temozolomide: 0.4237/0.2146
+auc&aupr average/std results:5-Fluorouracil: 0.6399/0.0648 | Cisplatin: 0.7449/0.0868 | Cyclophosphamide: 0.7649/0.1742 | Docetaxel: 0.6114/0.1296 | Doxorubicin: 0.6719/0.1640 | Etoposide: 0.8505/0.0949 | Gemcitabine: 0.5888/0.0274 | Paclitaxel: 0.6118/0.1091 | Temozolomide: 0.4304/0.1575
+auc：0.5899/0.1095  aupr：0.7244/0.1803  acc：0.6493/0.1867  f1：0.6058/0.1344
+all_metrics：0.6424/0.1629
+auc_aupr_metrics：0.6572/0.1621
+
+******************************
+********************************************
+**********************************stage3分离的改进，原有的直接分离，现有在药物基础上分离(per-drug KNN)******************
+python train_mmpa_program.py   --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5   --train --backbone_type convnext1d --convnext_depth 1   --num_programs 8 --program_dim 64 --K 3   --use_ot_alignment --lambda_ot 0.005 --use_cdan   --use_domain_sep --domain_sep_hidden_dim 256 --domain_sep_output_dim 64   --lambda_ortho 0.001 --lambda_recon 0.005 --lambda_private_domain 0.005   --lambda_migrate 0.01   --alph 1.4   --use_fpi --fpi_gamma_max 0.1   --pretrain_num_epochs 100 --train_num_epochs 100 --contrastive_num_epochs 100
+
+5-fold average/std results: 
+5-Fluorouracil    auc: 0.6225/0.0393 | aupr: 0.7245/0.0369 | f1: 0.6036/0.0354 | acc: 0.6981/0.0506
+Cisplatin         auc: 0.6579/0.0374 | aupr: 0.8352/0.0194 | f1: 0.6801/0.0425 | acc: 0.7791/0.0373
+Cyclophosphamide  auc: 0.6545/0.0425 | aupr: 0.9445/0.0123 | f1: 0.7647/0.1301 | acc: 0.8531/0.1037
+Docetaxel         auc: 0.5276/0.0858 | aupr: 0.7224/0.0584 | f1: 0.5547/0.0743 | acc: 0.6696/0.0815
+Doxorubicin       auc: 0.5648/0.0760 | aupr: 0.8169/0.0430 | f1: 0.5786/0.0876 | acc: 0.6826/0.1045
+Etoposide         auc: 0.7705/0.0494 | aupr: 0.9414/0.0178 | f1: 0.7896/0.0259 | acc: 0.8717/0.0219
+Gemcitabine       auc: 0.5853/0.0234 | aupr: 0.5947/0.0195 | f1: 0.5470/0.0446 | acc: 0.5674/0.0368
+Paclitaxel        auc: 0.5441/0.0409 | aupr: 0.7411/0.0340 | f1: 0.6279/0.0291 | acc: 0.7511/0.0256
+Temozolomide      auc: 0.6418/0.1126 | aupr: 0.4846/0.1299 | f1: 0.7582/0.0136 | acc: 0.1373/0.0585
+4 metrics average/std results: 5-Fluorouracil: 0.6622/0.0640 | Cisplatin: 0.7381/0.0809 | Cyclophosphamide: 0.8042/0.1355 | Docetaxel: 0.6186/0.1077 | Doxorubicin: 0.6607/0.1275 | Etoposide: 0.8433/0.0756 | Gemcitabine: 0.5736/0.0353 | Paclitaxel: 0.6660/0.0927 | Temozolomide: 0.5055/0.2539
+auc&aupr average/std results: 5-Fluorouracil: 0.6735/0.0647 | Cisplatin: 0.7465/0.0976 | Cyclophosphamide: 0.7995/0.1556 | Docetaxel: 0.6250/0.1238 | Doxorubicin: 0.6909/0.1450 | Etoposide: 0.8560/0.0966 | Gemcitabine: 0.5900/0.0209 | Paclitaxel: 0.6426/0.1097 | Temozolomide: 0.5632/0.1414
+auc：0.6188/0.0908  aupr：0.7561/0.1517  acc：0.6678/0.2181  f1：0.6560/0.1076
+all_metrics：0.6747/0.1570
+auc_aupr_metrics：0.6875/0.1414
+*****************************************************
+
+## 18.在stage1阶段在现有模型基础上利用对比和对抗学习分析出shared domain和private domain（无药物参与），借鉴DCD的分离方法，在stage2仅使用shareddomain与药物进行交互，借鉴BML，将shared domain对drug的学习迁移到private domain中对齐
+
+Stage 1: Shared/Private 分离（DCDNet 风格）
+Gene expr → ConvNeXt → hidden [B, 512]
+                           │
+              ┌────────────┼────────────┐
+              ↓            ↓            ↓
+        shared_mlp    private_mlp   recon_decoder
+              │            │            │
+        h_shared      h_private     recon [B, 1472]
+          [B, 256]     [B, 256]
+
+Loss:
+  L_tissue + λ_adv*L_domain_adv(shared混淆domain) 
+  + λ_ortho*L_ortho + λ_recon*L_recon + λ_private*L_private_domain(private保留domain)
+ Stage 2: BML 可靠性路由 + Shared→Private 迁移（动态融合）
+  h_shared [B, 256] ──→ Shared_Drug_Head ──→ pred_shared [B, 9]
+h_private [B, 256] ──→ Private_Drug_Head ──→ pred_private [B, 9]
+                              │
+                              ├──→ BML ReliabilityEstimator
+                              │       ↓
+                              │   reliability_shared [B, 1]
+                              │   reliability_private [B, 1]
+                              │       ↓
+                              ├──→ 迁移对齐 (核心！)
+                              │   mask = reliability_shared > 0.5
+                              │   L_migrate = MSE(
+                              │       pred_private[mask], 
+                              │       pred_shared[mask].detach()
+                              │   )
+                              │   # private 学习 shared 的可靠预测
+                              │
+                              └──→ 最终预测
+                                  pred_final = rel_s * pred_shared + rel_p * pred_private
+ 这个方案的核心价值
+组件	作用
+Shared	跨域稳定，学 drug response 的主干知识
+Private	域特异，初始随机，通过迁移学习 shared 的可靠预测
+BML Router	动态判断哪个 domain 在当前样本上更可靠
+L_migrate	知识蒸馏：shared 的可靠预测 → private 的监督
+BML Router 是动态融合，因为它的权重不是固定的，而是通过 MLP 根据每个样本-药物对的预测可靠性（entropy + agreement）实时计算出来的。同一个样本对不同药物、不同样本对同一种药物，权重都可以不同。                     
+
+

@@ -89,9 +89,30 @@ def main(args, update_params_dict, now_time):
 
     with open(os.path.join('train_params.json'), 'r') as f:
         training_params = json.load(f)
+    # Phase 11-C: Cross-Attention Fusion params
+    update_params_dict['use_cross_attn'] = args.use_cross_attn
+    update_params_dict['cross_attn_num_heads'] = args.cross_attn_num_heads
+
     training_params['unlabeled'].update(update_params_dict)
     training_params['labeled'].update(update_params_dict)
-    param_str = dict_to_str(update_params_dict)
+    # Build param_str with abbreviated keys to avoid overly long folder names (ENAMETOOLONG)
+    _key_abbr = {
+        'pretrain_num_epochs': 'pt',
+        'train_num_epochs': 'tr',
+        'contrastive_num_epochs': 'ct',
+        'domain_sep_hidden_dim': 'dsh',
+        'domain_sep_output_dim': 'dso',
+        'lambda_ortho': 'lo',
+        'lambda_recon': 'lr',
+        'lambda_private_domain': 'lpd',
+        'lambda_migrate': 'lm',
+    }
+    param_dict_for_str = {}
+    for k, v in update_params_dict.items():
+        if k in ('use_cross_attn', 'cross_attn_num_heads'):
+            continue  # appended manually below with shorter suffix
+        param_dict_for_str[_key_abbr.get(k, k)] = v
+    param_str = dict_to_str(param_dict_for_str)
 
     # Append program OT params to param_str to avoid result file collision
     if args.use_program_ot:
@@ -123,6 +144,134 @@ def main(args, update_params_dict, now_time):
         param_str += f"_l{args.drug_conditioned_ot_global_lambda}"
         if args.drug_conditioned_ot_mode == "discrepancy":
             param_str += f"_lmax{args.drug_conditioned_ot_lambda_max}"
+
+    # Append BPAF / LLRF params to param_str
+    if args.use_bpaf:
+        param_str += f"_bpaf_gmax{args.bpaf_gamma_max}_ginit{args.bpaf_gamma_init}"
+        if args.lambda_fusion_gamma_l1 > 0:
+            param_str += f"_gl1{args.lambda_fusion_gamma_l1}"
+    elif args.use_llrf:
+        param_str += f"_llrf_gmax{args.llrf_gamma_max}_ginit{args.llrf_gamma_init}"
+        if args.lambda_fusion_gamma_l1 > 0:
+            param_str += f"_gl1{args.lambda_fusion_gamma_l1}"
+
+    # Append Cross-Attention Fusion params to param_str
+    if args.use_cross_attn:
+        param_str += f"_crossAttn_h{args.cross_attn_num_heads}"
+
+    # Append FPI params to param_str
+    if args.use_fpi:
+        param_str += f"_fpi_gmax{args.fpi_gamma_max}_ginit{args.fpi_gamma_init}_qprior{args.fpi_q_prior_weight}"
+        if args.lambda_fpi_gamma_l1 > 0:
+            param_str += f"_fgl1{args.lambda_fpi_gamma_l1}"
+        if args.lambda_fpi_entropy > 0:
+            param_str += f"_fent{args.lambda_fpi_entropy}"
+        param_str += f"_detach{args.fpi_detach_mode}"
+        if args.use_fpi_sim:
+            param_str += "_sim"
+            param_str += f"_ua{args.fpi_sim_union_alpha}_ub{args.fpi_sim_union_beta}"
+            param_str += f"_pt{args.fpi_sim_program_temperature}_ft{args.fpi_sim_fragment_temperature}_ct{args.fpi_sim_cross_temperature}"
+        else:
+            param_str += "_global"
+        param_str += f"_m{args.fpi_m_max}_fp{args.fpi_fp_dim}"
+
+    # Append FPI Router params to param_str
+    if args.use_fpi_router:
+        param_str += f"_router_ggmax{args.router_gamma_global_max}_gginit{args.router_gamma_global_init}"
+        param_str += f"_gcmax{args.router_gamma_cross_max}_gcinit{args.router_gamma_cross_init}"
+        if args.lambda_router_gamma_l1 > 0:
+            param_str += f"_rgl1{args.lambda_router_gamma_l1}"
+        if args.lambda_router_gamma_global_l1 is not None and args.lambda_router_gamma_global_l1 > 0:
+            param_str += f"_rggl1{args.lambda_router_gamma_global_l1}"
+        if args.lambda_router_gamma_cross_l1 is not None and args.lambda_router_gamma_cross_l1 > 0:
+            param_str += f"_rgcl1{args.lambda_router_gamma_cross_l1}"
+        if args.router_cross_start_epoch > 0 or args.router_cross_ramp_epochs > 0:
+            param_str += f"_ramp{args.router_cross_start_epoch}+{args.router_cross_ramp_epochs}"
+        if args.router_cross_detach_mode != "none":
+            param_str += f"_crossdetach{args.router_cross_detach_mode}"
+        if args.router_two_stage_cross_only:
+            param_str += "_twostage"
+        param_str += f"_rgs{args.router_residual_global_scale}_rcs{args.router_residual_cross_scale}"
+        param_str += f"_m{args.fpi_m_max}_fp{args.fpi_fp_dim}"
+
+    # Append PDG params to param_str
+    if args.use_pdg:
+        param_str += f"_pdgK{args.pdg_k}_pdgdim{args.pdg_dim}_pdgconcat"
+        if args.pdg_no_normalize:
+            param_str += "_pdgnonorm"
+
+    # Append DCD-R params to param_str
+    if args.use_dcd_residual:
+        param_str += f"_dcdR_dgmax{args.dcd_gamma_max}_dginit{args.dcd_gamma_init}"
+        if args.lambda_dcd_gamma_l1 > 0:
+            param_str += f"_dgl1{args.lambda_dcd_gamma_l1}"
+        if args.lambda_dcd_ortho > 0:
+            param_str += f"_dortho{args.lambda_dcd_ortho}"
+        if args.dcd_use_absdiff:
+            param_str += "_dabs"
+
+    # Append Phase 11 main fusion params to param_str
+    if args.main_fusion_type != "bilinear":
+        param_str += f"_mf{args.main_fusion_type}_r{args.main_fusion_rank_dim}_o{args.main_fusion_out_dim}"
+        if args.main_fusion_type == "dcf_lrbf":
+            param_str += f"_film{args.film_init_scale}"
+
+    # Append Phase 12 VCB params to param_str
+    if args.use_vcb:
+        param_str += "_vcb"
+        param_str += f"_vkl{args.lambda_vcb_kl}"
+        param_str += f"_vwarm{args.vcb_warmup_ratio}"
+        z_dim_str = args.vcb_z_dim if args.vcb_z_dim > 0 else "same"
+        param_str += f"_vz{z_dim_str}"
+        if args.vcb_no_normalize:
+            param_str += "_vnonorm"
+
+    # Append Phase 13 S3R params to param_str
+    if args.use_s3r:
+        param_str += "_s3r"
+        sdneg = 0 if args.s3r_all_drug_negatives else 1
+        fns = 0 if args.s3r_no_suppress_false_negatives else 1
+        wpos = 1 if args.s3r_weighted_positives else 0
+        param_str += f"_sdneg{sdneg}_fns{fns}_wpos{wpos}"
+        if args.s3r_max_negatives_per_anchor > 0:
+            param_str += f"_nmax{args.s3r_max_negatives_per_anchor}"
+
+    # Append Phase 13-G: Gram volume alignment params to param_str
+    if args.use_gram_alignment:
+        param_str += f"_gram{args.lambda_gram}"
+
+    # Append Phase 17: Counterfactual causal augmentation params to param_str
+    if args.lambda_causal > 0.0:
+        param_str += f"_cf{args.lambda_causal}_abr{args.causal_ablation_ratio}"
+
+    # Append Phase 18: InfoNCE / hard negative / pos weighting params to param_str
+    if args.use_infonce:
+        param_str += "_infonce"
+        if args.hard_negatives_only:
+            param_str += f"_hn{args.num_hard_negs}"
+        if args.use_pos_weights:
+            param_str += "_pw"
+
+    # Append Phase 19: Differentiated contrastive learning params to param_str
+    if args.use_diff_contrastive:
+        param_str += f"_diff{args.diff_contrastive_alpha}"
+
+    # Append Phase 14-A Rank params to param_str
+    if args.use_rank_loss:
+        param_str += f"_rank_lrank{args.lambda_rank}_rmargin{args.rank_margin}"
+        if args.rank_max_pairs_per_drug > 0:
+            param_str += f"_rmaxp{args.rank_max_pairs_per_drug}"
+
+    # Append DCDA params to param_str
+    if args.use_dcda:
+        param_str += f"_dcda_t{args.dcda_timesteps}_id{args.dcda_interaction_dim}"
+        param_str += f"_ldiff{args.lambda_dcda_diff}_lalign{args.lambda_dcda_align}"
+
+    # Append Phase 18 domain separation params to param_str
+    if args.use_domain_sep:
+        param_str += f"_domsep_h{args.domain_sep_hidden_dim}_o{args.domain_sep_output_dim}"
+        param_str += f"_ortho{args.lambda_ortho}_recon{args.lambda_recon}_privdom{args.lambda_private_domain}"
+        param_str += f"_migrate{args.lambda_migrate}"
 
     save_folder = os.path.join("logs", now_time)
     safe_make_dir(save_folder)
@@ -234,7 +383,198 @@ def main(args, update_params_dict, now_time):
             'lambda_dspi_attn_entropy': args.lambda_dspi_attn_entropy,
             'lambda_dspi_program_balance': args.lambda_dspi_program_balance,
             'lambda_dspi_gram_consistency': args.lambda_dspi_gram_consistency,
-            'output_dir': os.path.dirname(log_dir),
+            # Phase 8-F: BPAF / LLRF
+            'use_bpaf': args.use_bpaf,
+            'bpaf_config': {
+                'program_dim': args.program_dim,
+                'drug_dim': 64,
+                'num_programs': args.num_programs,
+                'num_drugs': len(drugs),
+                'attention_temperature': args.bpaf_attention_temperature,
+                'q_prior_weight': args.bpaf_q_prior_weight,
+                'gamma_max': args.bpaf_gamma_max,
+                'gamma_init': args.bpaf_gamma_init,
+                'dropout': args.bpaf_dropout,
+                'adapter_include_h_pool': args.bpaf_adapter_include_h_pool,
+            },
+            'use_llrf': args.use_llrf,
+            'llrf_config': {
+                'program_dim': args.program_dim,
+                'drug_dim': 64,
+                'num_programs': args.num_programs,
+                'num_drugs': len(drugs),
+                'attention_temperature': args.bpaf_attention_temperature,
+                'q_prior_weight': args.bpaf_q_prior_weight,
+                'gamma_max': args.llrf_gamma_max,
+                'gamma_init': args.llrf_gamma_init,
+                'dropout': args.bpaf_dropout,
+            },
+            'lambda_fusion_gamma_l1': args.lambda_fusion_gamma_l1,
+            'lambda_selector_entropy': args.lambda_selector_entropy,
+            'lambda_selector_div': args.lambda_selector_div,
+            # Phase 9: FPI
+            'use_fpi': args.use_fpi,
+            'fpi_config': {
+                'program_dim': args.program_dim,
+                'drug_dim': 64,
+                'fragment_dim': args.program_dim,
+                'num_programs': args.num_programs,
+                'num_drugs': len(drugs),
+                'max_fragments': args.fpi_m_max,
+                'fp_dim': args.fpi_fp_dim,
+                'q_prior_weight': args.fpi_q_prior_weight,
+                'gamma_max': args.fpi_gamma_max,
+                'gamma_init': args.fpi_gamma_init,
+                'dropout': args.fpi_dropout,
+                'detach_mode': args.fpi_detach_mode,
+                'use_fpi_sim': args.use_fpi_sim,
+                'fpi_sim_config': {
+                    'q_prior_weight': args.fpi_sim_q_prior_weight,
+                    'program_temperature': args.fpi_sim_program_temperature,
+                    'fragment_temperature': args.fpi_sim_fragment_temperature,
+                    'cross_temperature': args.fpi_sim_cross_temperature,
+                    'union_alpha': args.fpi_sim_union_alpha,
+                    'union_beta': args.fpi_sim_union_beta,
+                    'use_modal_interaction': args.fpi_sim_use_modal_interaction,
+                    'selection_type': args.fpi_sim_selection_type,
+                },
+            },
+            'lambda_fpi_gamma_l1': args.lambda_fpi_gamma_l1,
+            'lambda_fpi_entropy': args.lambda_fpi_entropy,
+            # Phase 9-R: FPI Router
+            'lambda_router_gamma_global_l1': args.lambda_router_gamma_global_l1,
+            'lambda_router_gamma_cross_l1': args.lambda_router_gamma_cross_l1,
+            'use_fpi_router': args.use_fpi_router,
+            'fpi_router_config': {
+                'program_dim': args.program_dim,
+                'drug_dim': 64,
+                'fragment_dim': args.program_dim,
+                'num_programs': args.num_programs,
+                'num_drugs': len(drugs),
+                'max_fragments': args.fpi_m_max,
+                'q_prior_weight': args.fpi_q_prior_weight,
+                'gamma_global_max': args.router_gamma_global_max,
+                'gamma_global_init': args.router_gamma_global_init,
+                'gamma_cross_max': args.router_gamma_cross_max,
+                'gamma_cross_init': args.router_gamma_cross_init,
+                'dropout': args.fpi_dropout,
+                'router_cross_start_epoch': args.router_cross_start_epoch,
+                'router_cross_ramp_epochs': args.router_cross_ramp_epochs,
+                'router_cross_mode': args.router_cross_mode,
+                'router_oracle_cross_drugs': args.router_oracle_cross_drugs,
+                'router_residual_global_scale': args.router_residual_global_scale,
+                'router_residual_cross_scale': args.router_residual_cross_scale,
+                'router_branch_effect_threshold': args.router_branch_effect_threshold,
+                'router_cross_detach_mode': args.router_cross_detach_mode,
+                'debug_fixed_gamma_global': args.router_debug_fixed_gamma_global,
+                'debug_fixed_gamma_cross': args.router_debug_fixed_gamma_cross,
+            },
+            'router_two_stage_cross_only': args.router_two_stage_cross_only,
+            'router_freeze_main_for_cross': args.router_freeze_main_for_cross,
+            'router_stage_a_checkpoint_dir': args.router_stage_a_checkpoint_dir,
+            'lambda_router_gamma_l1': args.lambda_router_gamma_l1,
+            # Phase 10: Pseudo-Domain Guide
+            'use_pdg': args.use_pdg,
+            'pdg_config': {
+                'pdg_dim': args.pdg_dim,
+                'assign_mode': args.pdg_assign_mode,
+                'normalize': not args.pdg_no_normalize,
+                'pdg_k': args.pdg_k,
+            },
+            'pdg_centroid_path': args.pdg_centroid_path,
+            # Phase 10-D: DCD-R
+            'use_dcd_residual': args.use_dcd_residual,
+            'dcd_config': {
+                'hidden_dim': args.program_dim,
+                'drug_dim': 64,
+                'num_drugs': len(drugs),
+                'dcd_hidden_dim': args.dcd_hidden_dim,
+                'gamma_max': args.dcd_gamma_max,
+                'gamma_init': args.dcd_gamma_init,
+                'dropout': args.dcd_dropout,
+                'use_product': True,
+                'use_absdiff': args.dcd_use_absdiff,
+            },
+            'lambda_dcd_gamma_l1': args.lambda_dcd_gamma_l1,
+            'lambda_dcd_ortho': args.lambda_dcd_ortho,
+            # Phase 11: Main Fusion Replacement
+            'main_fusion_type': args.main_fusion_type,
+            'main_fusion_config': {
+                'rank_dim': args.main_fusion_rank_dim,
+                'out_dim': args.main_fusion_out_dim,
+                'dropout': args.dcd_dropout if hasattr(args, 'dcd_dropout') else 0.1,
+                'use_layernorm': not args.main_fusion_no_layernorm,
+                'film_init_scale': args.film_init_scale,
+            },
+            # Phase 12: VCB
+            'use_vcb': args.use_vcb,
+            'vcb_config': {
+                'z_dim': None if args.vcb_z_dim <= 0 else args.vcb_z_dim,
+                'hidden_dim': None if args.vcb_hidden_dim <= 0 else args.vcb_hidden_dim,
+                'dropout': args.vcb_dropout,
+                'logvar_min': args.vcb_logvar_min,
+                'logvar_max': args.vcb_logvar_max,
+                'normalize_z': not args.vcb_no_normalize,
+            },
+            'lambda_vcb_kl': args.lambda_vcb_kl,
+            'vcb_warmup_ratio': args.vcb_warmup_ratio,
+            # Phase 13: S3R
+            'use_s3r': args.use_s3r,
+            's3r_same_drug_negatives': not args.s3r_all_drug_negatives,
+            's3r_suppress_false_negatives': not args.s3r_no_suppress_false_negatives,
+            's3r_weighted_positives': args.s3r_weighted_positives,
+            's3r_positive_temperature': args.s3r_positive_temperature,
+            's3r_max_negatives_per_anchor': args.s3r_max_negatives_per_anchor,
+            's3r_loss_temperature': args.s3r_loss_temperature,
+            # Phase 13-G: Gram volume alignment
+            'use_gram_alignment': args.use_gram_alignment,
+            'lambda_gram': args.lambda_gram,
+            # Phase 17: Counterfactual causal augmentation
+            'lambda_causal': args.lambda_causal,
+            'causal_ablation_ratio': args.causal_ablation_ratio,
+            # Phase 18: InfoNCE / hard negative / pos weighting
+            'use_infonce': args.use_infonce,
+            'hard_negatives_only': args.hard_negatives_only,
+            'num_hard_negs': args.num_hard_negs,
+            'use_pos_weights': args.use_pos_weights,
+            # Phase 19: Differentiated contrastive learning (DKC-inspired)
+            'use_diff_contrastive': args.use_diff_contrastive,
+            'diff_contrastive_alpha': args.diff_contrastive_alpha,
+            # Phase 14-A / 15-B: Drug-wise Pairwise Ranking Loss
+            'use_rank_loss': args.use_rank_loss,
+            'lambda_rank': args.lambda_rank if args.use_rank_loss else 0.0,
+            'rank_margin': args.rank_margin,
+            'rank_max_pairs_per_drug': args.rank_max_pairs_per_drug,
+            'rank_debug_sanity': args.rank_debug_sanity,
+            # Phase 15-B: Effective Drug-wise Ranking Loss Sweep
+            'ranking_warmup_epochs': args.ranking_warmup_epochs,
+            'ranking_min_pos': args.ranking_min_pos,
+            'ranking_min_neg': args.ranking_min_neg,
+            'ranking_log_grad_ratio': args.ranking_log_grad_ratio,
+            'ranking_log_drugwise_pair_acc': args.ranking_log_drugwise_pair_acc,
+            'ranking_log_interval': args.ranking_log_interval,
+            # Phase 16: FAMO
+            'use_famo': args.use_famo,
+            'famo_gamma': args.famo_gamma,
+            'famo_w_lr': args.famo_w_lr,
+            'famo_max_norm': args.famo_max_norm,
+            # Phase DCDA
+            'use_dcda': args.use_dcda,
+            'dcda_config': {
+                'timesteps': args.dcda_timesteps,
+                'interaction_dim': args.dcda_interaction_dim,
+            },
+            'lambda_dcda_diff': args.lambda_dcda_diff,
+            'lambda_dcda_align': args.lambda_dcda_align,
+            # Phase 18: Domain Separation
+            'use_domain_sep': args.use_domain_sep,
+            'domain_sep_hidden_dim': args.domain_sep_hidden_dim,
+            'domain_sep_output_dim': args.domain_sep_output_dim,
+            'lambda_ortho': args.lambda_ortho,
+            'lambda_recon': args.lambda_recon,
+            'lambda_private_domain': args.lambda_private_domain,
+            'lambda_migrate': args.lambda_migrate,
+            'output_dir': args.output_dir if args.output_dir else os.path.dirname(log_dir),
         })
     safe_make_dir(training_params['model_save_folder'])
 
@@ -260,6 +600,9 @@ def main(args, update_params_dict, now_time):
         convnext_depth=args.convnext_depth,
         convnext_kernel_size=args.convnext_kernel_size,
         convnext_expansion=args.convnext_expansion,
+        use_domain_sep=args.use_domain_sep,
+        domain_sep_hidden_dim=args.domain_sep_hidden_dim,
+        domain_sep_output_dim=args.domain_sep_output_dim,
     ).to(device)
 
     # pre-training
@@ -274,16 +617,36 @@ def main(args, update_params_dict, now_time):
         weight_decay=1e-4,
         lambda_div=args.lambda_div,
         lambda_sparse=args.lambda_sparse,
+        lambda_ortho=args.lambda_ortho,
+        lambda_recon=args.lambda_recon,
+        lambda_private_domain=args.lambda_private_domain,
     )
 
     save_feat_program(model=trained_model, s_dataloaders=s_dataloaders, t_dataloaders=t_dataloaders, device=device)
 
+    # Save stage1 model for downstream use (e.g., pseudo-domain building)
+    stage1_ckpt_dir = os.path.join("checkpoints", "stage1")
+    safe_make_dir(stage1_ckpt_dir)
+    stage1_ckpt_path = os.path.join(stage1_ckpt_dir, "stage1_model.pt")
+    torch.save(trained_model.state_dict(), stage1_ckpt_path)
+    print(f"Saved Stage1 model to {stage1_ckpt_path}")
 
     print("======================= stage 2 & 3 (MMPA Program) =======================")
     # Data construction for feature fusion and drug response prediction
     labeled_dataloader = get_multi_labeled_dataloader(gex_features_df=gex_features_df, seed=seed, batch_size=training_params['labeled']['batch_size'],
                                                       drug=drugs, ccle_measurement=args.measurement, threshold_gdsc=args.thres_g, threshold_label=args.thres_s,
                                                       n_splits=args.n)
+
+    # Load drug fragments if FPI is enabled
+    frag_fp = None
+    frag_mask = None
+    frag_smiles = None
+    if args.use_fpi or args.use_fpi_router:
+        from mmpa_drp.fragment_utils import load_drug_fragments
+        frag_data = load_drug_fragments(args.fpi_fragment_npz, expected_drug_names=drugs)
+        frag_fp = frag_data["frag_fp"].to(device)
+        frag_mask = frag_data["frag_mask"].to(device)
+        frag_smiles = frag_data["frag_smiles"]
 
     method_name = param_str
     fold = 0
@@ -295,9 +658,22 @@ def main(args, update_params_dict, now_time):
         ft_encoder = deepcopy(trained_model.program_encoder)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            fusion_model = fusion_training_program(encoder=ft_encoder, train_dataloader=train_labeled_ccle, val_dataloader=test_labeled_ccle, test_dataloader = labeled_tcga,
-                                            drugs=drugs, gene_num = gex_features_df.shape[1] - 1, drug_feat = drug_feat, fold=fold, method_name=method_name, **wrap_params(training_params, type='labeled'))
-            fusion_model.load_state_dict(torch.load(os.path.join(training_params['model_save_folder'], 'fusion_model.pt')))
+            fusion_model = fusion_training_program(
+                encoder=ft_encoder,
+                train_dataloader=train_labeled_ccle,
+                val_dataloader=test_labeled_ccle,
+                test_dataloader=labeled_tcga,
+                drugs=drugs,
+                gene_num=gex_features_df.shape[1] - 1,
+                drug_feat=drug_feat,
+                fold=fold,
+                method_name=method_name,
+                frag_fp=frag_fp,
+                frag_mask=frag_mask,
+                frag_smiles=frag_smiles,
+                **wrap_params(training_params, type='labeled')
+            )
+            fusion_model.load_state_dict(torch.load(os.path.join(training_params['model_save_folder'], f'fusion_model_fold{fold}.pt')))
 
             test_loss, results, y_true, y_pred, y_mask = testing(model=fusion_model, t_dataloader=labeled_tcga, drug_feat=drug_feat, device=training_params['device'])
             print('test-avg (TCGA) metrics (auc,aupr,f1,acc): {}'.format(np.around(results.mean(axis=1), 4)))
@@ -412,6 +788,7 @@ def main(args, update_params_dict, now_time):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('MMPA-DRP Training')
+    parser.add_argument('--output_dir', type=str, default=None, help='Override output directory for diagnostics and logs')
     parser.add_argument('--metric', dest='metric', nargs='?', default='auroc', choices=['auroc', 'auprc'])
     parser.add_argument('--measurement', dest='measurement', nargs='?', default='Z_SCORE', choices=['Z_SCORE', 'LN_IC50', 'AUC'])
     parser.add_argument('--thres_gdsc', dest='thres_g', nargs='?', type=float, default=0.0)
@@ -442,7 +819,7 @@ if __name__ == '__main__':
 
     # Phase OT: Optimal Transport alignment loss (training-only)
     parser.add_argument('--use_ot_alignment', action='store_true', help='Enable OT alignment loss (training-only, no inference change)')
-    parser.add_argument('--lambda_ot', type=float, default=0.01, help='OT loss weight')
+    parser.add_argument('--lambda_ot', type=float, default=0.005, help='OT loss weight')
     parser.add_argument('--ot_reg', type=float, default=0.1, help='Sinkhorn entropy regularization')
     parser.add_argument('--ot_max_iter', type=int, default=50, help='Sinkhorn max iterations')
     parser.add_argument('--ot_cost_type', type=str, default='cosine', choices=['cosine', 'euclidean'], help='OT cost metric')
@@ -490,7 +867,10 @@ if __name__ == '__main__':
     parser.add_argument('--lambda_q_align', type=float, default=0.001, help='q align loss weight')
     parser.add_argument('--enable_grad_diagnostics', action='store_true', help='Enable gradient diagnostics')
     parser.add_argument('--grad_diag_every', type=int, default=50, help='Compute grad diagnostics every N steps')
-    parser.add_argument('--K', type=int, default=7, help='Top-K for contrastive domain isolation')
+    parser.add_argument('--K', type=int, default=3, help='Top-K for contrastive domain isolation')
+    parser.add_argument('--pretrain_num_epochs', type=int, default=300, help='Pretraining epochs')
+    parser.add_argument('--train_num_epochs', type=int, default=100, help='Training epochs')
+    parser.add_argument('--contrastive_num_epochs', type=int, default=200, help='Contrastive epochs')
 
     # Phase 8: Drug-Selective Program Interaction (DSPI)
     parser.add_argument('--use_dspi', action='store_true', help='Enable Drug-Selective Program Interaction (Phase 8)')
@@ -506,12 +886,185 @@ if __name__ == '__main__':
     parser.add_argument('--lambda_dspi_program_balance', type=float, default=0.0, help='DSPI program usage balance loss weight')
     parser.add_argument('--lambda_dspi_gram_consistency', type=float, default=0.0, help='DSPI Gram consistency loss weight')
 
+    # Phase 8-F: BasePreservingAdapterFusion (BPAF)
+    parser.add_argument('--use_bpaf', action='store_true', help='Enable BasePreservingAdapterFusion (Phase 8-F)')
+    parser.add_argument('--bpaf_gamma_max', type=float, default=0.05, help='BPAF gamma max')
+    parser.add_argument('--bpaf_gamma_init', type=float, default=0.02, help='BPAF gamma init')
+    parser.add_argument('--bpaf_q_prior_weight', type=float, default=0.01, help='BPAF selector q prior weight')
+    parser.add_argument('--bpaf_attention_temperature', type=float, default=1.0, help='BPAF selector attention temperature')
+    parser.add_argument('--bpaf_dropout', type=float, default=0.1, help='BPAF adapter dropout')
+    parser.add_argument('--bpaf_adapter_include_h_pool', action='store_true', default=True, help='Include h_pool in adapter input')
+    parser.add_argument('--no_bpaf_h_pool', dest='bpaf_adapter_include_h_pool', action='store_false')
+
+    # Phase 8-F: LateLogitResidualFusion (LLRF)
+    parser.add_argument('--use_llrf', action='store_true', help='Enable LateLogitResidualFusion (Phase 8-F)')
+    parser.add_argument('--llrf_gamma_max', type=float, default=0.1, help='LLRF gamma max')
+    parser.add_argument('--llrf_gamma_init', type=float, default=0.02, help='LLRF gamma init')
+
+    # Phase 8-F: Fusion-Repair regularization
+    parser.add_argument('--lambda_fusion_gamma_l1', type=float, default=0.001, help='L1 regularization on fusion gamma')
+    parser.add_argument('--lambda_selector_entropy', type=float, default=0.0, help='Selector attention entropy loss weight')
+    parser.add_argument('--lambda_selector_div', type=float, default=0.0, help='Selector attention diversity loss weight')
+
+    # Phase 9: Fragment-Program Interaction (FPI)
+    parser.add_argument('--use_fpi', action='store_true', help='Enable Fragment-Program Interaction (Phase 9)')
+    parser.add_argument('--fpi_fragment_npz', type=str, default='data/drug_fragments_brics_m16_fp1024.npz', help='Path to precomputed fragment NPZ')
+    parser.add_argument('--fpi_gamma_max', type=float, default=0.1, help='FPI gamma max')
+    parser.add_argument('--fpi_gamma_init', type=float, default=0.05, help='FPI gamma init')
+    parser.add_argument('--fpi_q_prior_weight', type=float, default=0.01, help='FPI q prior weight')
+    parser.add_argument('--fpi_dropout', type=float, default=0.1, help='FPI dropout')
+    parser.add_argument('--fpi_m_max', type=int, default=16, help='Max fragments per drug')
+    parser.add_argument('--fpi_fp_dim', type=int, default=1024, help='Fragment fingerprint dimension')
+    parser.add_argument('--lambda_fpi_gamma_l1', type=float, default=0.0, help='L1 regularization on FPI gamma')
+    parser.add_argument('--lambda_fpi_entropy', type=float, default=0.0, help='FPI attention entropy loss weight')
+    parser.add_argument('--fpi_detach_mode', type=str, default='none', choices=['none', 'z', 'zq', 'zq_drug', 'all'], help='Stop-gradient mode for FPI branch')
+    parser.add_argument('--use_fpi_sim', action='store_true', help='Enable FPI-SIM (Signal-style selective interaction)')
+    parser.add_argument('--fpi_sim_q_prior_weight', type=float, default=0.01, help='FPI-SIM q prior weight for program intra selection')
+    parser.add_argument('--fpi_sim_program_temperature', type=float, default=1.0, help='FPI-SIM program intra selection temperature')
+    parser.add_argument('--fpi_sim_fragment_temperature', type=float, default=1.0, help='FPI-SIM fragment intra selection temperature')
+    parser.add_argument('--fpi_sim_cross_temperature', type=float, default=1.0, help='FPI-SIM cross-modal attention temperature')
+    parser.add_argument('--fpi_sim_union_alpha', type=float, default=1.0, help='FPI-SIM union alpha weight')
+    parser.add_argument('--fpi_sim_union_beta', type=float, default=1.0, help='FPI-SIM union beta weight')
+    parser.add_argument('--fpi_sim_use_modal_interaction', action='store_true', help='Enable modal interaction in FPI-SIM (first version: disabled by default)')
+    parser.add_argument('--fpi_sim_selection_type', type=str, default='soft', choices=['soft', 'hard_topk'], help='FPI-SIM selection type (first version: soft only)')
+
+    # Phase 9-R: FPI Router (DualFPIResidualRouter)
+    parser.add_argument('--use_fpi_router', action='store_true', help='Enable DualFPIResidualRouter (Phase 9-R)')
+    parser.add_argument('--router_gamma_global_max', type=float, default=0.05, help='Router global gamma max')
+    parser.add_argument('--router_gamma_global_init', type=float, default=0.0, help='Router global gamma init')
+    parser.add_argument('--router_gamma_cross_max', type=float, default=0.05, help='Router cross gamma max')
+    parser.add_argument('--router_gamma_cross_init', type=float, default=0.0, help='Router cross gamma init')
+    parser.add_argument('--router_residual_global_scale', type=float, default=1.0, help='Router global residual scale')
+    parser.add_argument('--router_residual_cross_scale', type=float, default=1.0, help='Router cross residual scale')
+    parser.add_argument('--router_cross_start_epoch', type=int, default=0, help='Epoch to start cross branch activation')
+    parser.add_argument('--router_cross_ramp_epochs', type=int, default=0, help='Number of epochs to ramp cross branch')
+    parser.add_argument('--router_cross_mode', type=str, default='learnable', choices=['learnable', 'oracle_mask'], help='Cross branch mode')
+    parser.add_argument('--router_oracle_cross_drugs', type=str, default='', help='Comma-separated drug names for oracle cross mask (diagnostic only)')
+    parser.add_argument('--router_branch_effect_threshold', type=float, default=1e-4, help='Threshold for branch effect diagnostics')
+    parser.add_argument('--router_cross_detach_mode', type=str, default='none', choices=['none', 'z', 'zq', 'zq_drug', 'all'], help='Detach mode for cross branch inputs (none/z/zq/zq_drug/all)')
+    parser.add_argument('--router_two_stage_cross_only', action='store_true', help='Stage B: train only cross branch after loading Stage A checkpoint')
+    parser.add_argument('--router_freeze_main_for_cross', action='store_true', help='Freeze main model (encoder/drug_mlp/bilinear/global_fpi/gamma_global) in Stage B')
+    parser.add_argument('--router_stage_a_checkpoint_dir', type=str, default='', help='Directory containing Stage A checkpoint for two-stage training')
+    parser.add_argument('--lambda_router_gamma_l1', type=float, default=0.0, help='L1 regularization on router gamma gates (deprecated, use separate global/cross L1)')
+    parser.add_argument('--lambda_router_gamma_global_l1', type=float, default=None, help='L1 regularization on router global gamma gate')
+    parser.add_argument('--lambda_router_gamma_cross_l1', type=float, default=None, help='L1 regularization on router cross gamma gate')
+    parser.add_argument('--router_debug_fixed_gamma_global', type=float, default=None, help='DEBUG: fix global gamma to this value (overrides learnable gamma)')
+    parser.add_argument('--router_debug_fixed_gamma_cross', type=float, default=None, help='DEBUG: fix cross gamma to this value (overrides learnable gamma_cross)')
+
+    # Phase 11-C: Cross-Attention Fusion (Signal-style)
+    parser.add_argument('--use_cross_attn', action='store_true', help='Enable Cross-Attention Fusion to replace Bilinear')
+    parser.add_argument('--cross_attn_num_heads', type=int, default=4, help='Number of attention heads for Cross-Attention Fusion')
+
+    # Phase 10: Pseudo-Domain Guide (PDG)
+    parser.add_argument('--use_pdg', action='store_true', help='Enable Pseudo-Domain Guided Fusion (Phase 10)')
+    parser.add_argument('--pdg_centroid_path', type=str, default=None, help='Path template to PDG centroids NPY (use {fold} for fold index)')
+    parser.add_argument('--pdg_dim', type=int, default=32, help='PDG embedding dimension')
+    parser.add_argument('--pdg_k', type=int, default=8, help='Number of pseudo-domain clusters')
+    parser.add_argument('--pdg_assign_mode', type=str, default='nearest', choices=['nearest'], help='PDG assignment mode')
+    parser.add_argument('--pdg_normalize', action='store_true', default=True, help='L2-normalize before cosine similarity')
+    parser.add_argument('--pdg_no_normalize', action='store_true', help='Disable L2 normalization in PDG')
+
+    # Phase 10-D: Residual Decoupled Fusion (DCD-R)
+    parser.add_argument('--use_dcd_residual', action='store_true', help='Enable Residual Decoupled Fusion (Phase 10-D)')
+    parser.add_argument('--dcd_gamma_max', type=float, default=0.03, help='DCD-R gamma max (default 0.03)')
+    parser.add_argument('--dcd_gamma_init', type=float, default=0.005, help='DCD-R gamma init (default 0.005)')
+    parser.add_argument('--dcd_hidden_dim', type=int, default=64, help='DCD-R residual head hidden dim')
+    parser.add_argument('--dcd_use_absdiff', action='store_true', help='Use absdiff feature in DCD-R residual head')
+    parser.add_argument('--dcd_dropout', type=float, default=0.1, help='DCD-R MLP dropout')
+    parser.add_argument('--lambda_dcd_gamma_l1', type=float, default=0.0, help='L1 regularization on DCD gamma')
+    parser.add_argument('--lambda_dcd_ortho', type=float, default=0.0, help='Orthogonality loss weight between shared and private')
+
+    # Phase 11: Main Fusion Replacement
+    parser.add_argument('--main_fusion_type', type=str, default='bilinear', choices=['bilinear', 'lrbf', 'dcf_lrbf'], help='Main gene-drug fusion type (Phase 11)')
+    parser.add_argument('--main_fusion_rank_dim', type=int, default=64, help='Low-rank dimension for LRBF/DCF-LRBF')
+    parser.add_argument('--main_fusion_out_dim', type=int, default=128, help='Output dimension for main fusion replacement')
+    parser.add_argument('--film_init_scale', type=float, default=0.001, help='FiLM output layer init std (near-identity)')
+    parser.add_argument('--main_fusion_layernorm', action='store_true', default=True, help='Use LayerNorm in main fusion MLPs')
+    parser.add_argument('--main_fusion_no_layernorm', action='store_true', help='Disable LayerNorm in main fusion MLPs')
+
+    # Phase 12: Variational Contrastive Bottleneck (VCB)
+    parser.add_argument('--use_vcb', action='store_true', help='Enable Variational Contrastive Bottleneck (Phase 12)')
+    parser.add_argument('--vcb_z_dim', type=int, default=0, help='VCB latent dim (0 = same as fused_feature_dim)')
+    parser.add_argument('--vcb_hidden_dim', type=int, default=0, help='VCB backbone hidden dim (0 = same as fused_feature_dim)')
+    parser.add_argument('--vcb_dropout', type=float, default=0.1, help='VCB dropout')
+    parser.add_argument('--vcb_logvar_min', type=float, default=-6.0, help='VCB logvar clamp min')
+    parser.add_argument('--vcb_logvar_max', type=float, default=2.0, help='VCB logvar clamp max')
+    parser.add_argument('--vcb_no_normalize', action='store_true', help='Disable L2 normalization of VCB z')
+    parser.add_argument('--lambda_vcb_kl', type=float, default=0.0, help='VCB KL loss weight')
+    parser.add_argument('--vcb_warmup_ratio', type=float, default=0.1, help='VCB beta warm-up ratio')
+
+    # Phase 13: Reliable Stage-3 Contrastive Anchoring (S3R)
+    parser.add_argument('--use_s3r', action='store_true', help='Enable S3R reliable contrastive anchoring (Phase 13)')
+    parser.add_argument('--s3r_same_drug_negatives', action='store_true', default=True, help='Use same-drug negatives only')
+    parser.add_argument('--s3r_all_drug_negatives', action='store_true', help='Use all-drug negatives (override same-drug)')
+    parser.add_argument('--s3r_suppress_false_negatives', action='store_true', default=True, help='Remove positives from negative pool')
+    parser.add_argument('--s3r_no_suppress_false_negatives', action='store_true', help='Disable false-negative suppression')
+    parser.add_argument('--s3r_weighted_positives', action='store_true', help='Weight positives by similarity/rank')
+    parser.add_argument('--s3r_positive_temperature', type=float, default=0.1, help='Temperature for positive weighting')
+    parser.add_argument('--s3r_max_negatives_per_anchor', type=int, default=0, help='Max negatives per anchor (0 = unlimited)')
+    parser.add_argument('--s3r_loss_temperature', type=float, default=0.1, help='Temperature for contrastive loss')
+
+    # Phase 13-G: Gram Volume Alignment (replaces contrastive)
+    parser.add_argument('--use_gram_alignment', action='store_true', help='Enable Gram volume alignment in Stage 3 (replaces contrastive)')
+    parser.add_argument('--lambda_gram', type=float, default=0.01, help='Weight for Gram volume loss')
+
+    # Phase 17: Counterfactual Causal Augmentation
+    parser.add_argument('--lambda_causal', type=float, default=0.0, help='Weight for counterfactual causal augmentation loss (Stage 3)')
+    parser.add_argument('--causal_ablation_ratio', type=float, default=0.1, help='Ratio of genes to ablate for counterfactual augmentation')
+
+    # Phase 18: InfoNCE / Hard Negative / Pos Weighting
+    parser.add_argument('--use_infonce', action='store_true', help='Use standard InfoNCE instead of legacy multi-label BCE for Stage 3 contrastive')
+    parser.add_argument('--hard_negatives_only', action='store_true', help='In InfoNCE, only use top-N hardest negatives')
+    parser.add_argument('--num_hard_negs', type=int, default=50, help='Number of hard negatives to keep')
+    parser.add_argument('--use_pos_weights', action='store_true', help='Weight positive samples by KNN similarity in InfoNCE')
+
+    # Phase 19: Differentiated Contrastive Learning (DKC-inspired)
+    parser.add_argument('--use_diff_contrastive', action='store_true', help='Enable differentiated contrastive learning: low-confidence samples get higher weights')
+    parser.add_argument('--diff_contrastive_alpha', type=float, default=2.0, help='Max weight for low-confidence samples (weight = alpha - (alpha-1)*confidence)')
+
+    # Phase 14-A: Drug-wise Pairwise Ranking Loss
+    parser.add_argument('--use_rank_loss', action='store_true', help='Enable drug-wise pairwise ranking loss (Phase 14-A)')
+    parser.add_argument('--lambda_rank', type=float, default=0.0, help='Weight for ranking loss')
+    parser.add_argument('--rank_margin', type=float, default=0.0, help='Ranking margin')
+    parser.add_argument('--rank_max_pairs_per_drug', type=int, default=0, help='Max pairs per drug (0 = unlimited)')
+    parser.add_argument('--rank_debug_sanity', action='store_true', help='Enable rank loss sanity debug (allows lambda_rank=0)')
+
+    # Phase 15-B: Effective Drug-wise Ranking Loss Sweep
+    parser.add_argument('--ranking_warmup_epochs', type=int, default=0, help='Linear warm-up epochs for lambda_rank (0 = no warm-up)')
+    parser.add_argument('--ranking_min_pos', type=int, default=1, help='Min positive samples per drug for ranking loss')
+    parser.add_argument('--ranking_min_neg', type=int, default=1, help='Min negative samples per drug for ranking loss')
+    parser.add_argument('--ranking_log_grad_ratio', action='store_true', help='Log ranking vs BCE gradient norm ratio')
+    parser.add_argument('--ranking_log_drugwise_pair_acc', action='store_true', help='Log per-drug pairwise ranking accuracy')
+    parser.add_argument('--ranking_log_interval', type=int, default=50, help='Interval (steps) for gradient ratio logging')
+
+    # Phase 16: FAMO (Fast Adaptive Multitask Optimization)
+    parser.add_argument('--use_famo', action='store_true', help='Enable FAMO for drug-wise multitask optimization')
+    parser.add_argument('--famo_gamma', type=float, default=0.01, help='FAMO weight regularization coefficient')
+    parser.add_argument('--famo_w_lr', type=float, default=0.025, help='FAMO task weight learning rate')
+    parser.add_argument('--famo_max_norm', type=float, default=1.0, help='FAMO gradient clipping max norm')
+
+    # Phase DCDA: Drug-Conditioned Domain Diffusion Alignment
+    parser.add_argument('--use_dcda', action='store_true', help='Enable DCDA (HorizonRec-inspired domain alignment)')
+    parser.add_argument('--dcda_timesteps', type=int, default=10, help='DCDA diffusion timesteps')
+    parser.add_argument('--dcda_interaction_dim', type=int, default=128, help='DCDA interaction projection dim')
+    parser.add_argument('--lambda_dcda_diff', type=float, default=0.1, help='DCDA diffusion loss weight')
+    parser.add_argument('--lambda_dcda_align', type=float, default=0.05, help='DCDA domain alignment loss weight')
+
+    # Phase 18: Domain Separation (DCDNet-style + BML Router)
+    parser.add_argument('--use_domain_sep', action='store_true', help='Enable domain-level shared/private decomposition')
+    parser.add_argument('--domain_sep_hidden_dim', type=int, default=256, help='Hidden dim for domain separation MLPs')
+    parser.add_argument('--domain_sep_output_dim', type=int, default=64, help='Output dim for shared/private representations')
+    parser.add_argument('--lambda_ortho', type=float, default=0.001, help='Orthogonality loss weight between shared and private')
+    parser.add_argument('--lambda_recon', type=float, default=0.001, help='Reconstruction loss weight (hidden vs shared+private)')
+    parser.add_argument('--lambda_private_domain', type=float, default=0.001, help='Private domain classification loss weight')
+    parser.add_argument('--lambda_migrate', type=float, default=0.01, help='Stage 2: migration loss weight (private learns from reliable shared)')
+
     # Phase 5: Backbone selection (ConvNeXt V2-inspired)
-    parser.add_argument('--backbone_type', type=str, default='mlp', choices=['mlp', 'grn_mlp', 'convnext1d'], help='Backbone type for MolecularProgramEncoder')
+    parser.add_argument('--backbone_type', type=str, default='convnext1d', choices=['mlp', 'grn_mlp', 'convnext1d'], help='Backbone type for MolecularProgramEncoder')
     parser.add_argument('--norm_type', type=str, default='layernorm', choices=['layernorm', 'batchnorm'], help='Normalization type for GRN-MLP')
     parser.add_argument('--num_gene_tokens', type=int, default=64, help='Number of gene tokens for ConvNeXt1D tokenizer')
     parser.add_argument('--token_dim', type=int, default=64, help='Token dimension for ConvNeXt1D')
-    parser.add_argument('--convnext_depth', type=int, default=2, help='Number of ConvNeXt1D blocks')
+    parser.add_argument('--convnext_depth', type=int, default=1, help='Number of ConvNeXt1D blocks')
     parser.add_argument('--convnext_kernel_size', type=int, default=7, help='Kernel size for ConvNeXt1D depthwise conv')
     parser.add_argument('--convnext_expansion', type=int, default=4, help='Expansion factor for ConvNeXt1D MLP')
 
@@ -526,6 +1079,16 @@ if __name__ == '__main__':
     parser.set_defaults(norm_flag=True)
 
     args = parser.parse_args()
+    if args.use_bpaf and args.use_llrf:
+        parser.error("--use_bpaf and --use_llrf cannot be used together")
+    if args.use_fpi and (args.use_bpaf or args.use_llrf or args.use_dspi or args.use_drug_gate):
+        parser.error("--use_fpi is incompatible with --use_bpaf, --use_llrf, --use_dspi, --use_drug_gate")
+    if args.use_rank_loss and args.lambda_rank < 0:
+        parser.error("--use_rank_loss requires --lambda_rank >= 0")
+    if args.use_fpi_router and (args.use_fpi or args.use_bpaf or args.use_llrf or args.use_dspi or args.use_drug_gate):
+        parser.error("--use_fpi_router is incompatible with --use_fpi, --use_bpaf, --use_llrf, --use_dspi, --use_drug_gate")
+    if args.use_pdg and args.pdg_centroid_path is None:
+        parser.error("--use_pdg requires --pdg_centroid_path")
     print(f'current config is {args}')
     # params_grid = {
     #     "pretrain_num_epochs": [10],
@@ -534,9 +1097,9 @@ if __name__ == '__main__':
     #     "K": [1,3,5,7,9]
     # }
     params_grid = {
-        "pretrain_num_epochs": [300],
-        "train_num_epochs": [100],
-        "contrastive_num_epochs": [200],
+        "pretrain_num_epochs": [args.pretrain_num_epochs],
+        "train_num_epochs": [args.train_num_epochs],
+        "contrastive_num_epochs": [args.contrastive_num_epochs],
         "K": [args.K]
     }
 

@@ -6,7 +6,7 @@ from sklearn.metrics import roc_auc_score, accuracy_score, f1_score, auc, precis
 from utility import auprc
 import config
 
-def multi_eval_epoch(model, loader, drug_feat, device):
+def multi_eval_epoch(model, loader, drug_feat, device, domain_idx=None):
     model.eval()
     total_loss = 0
     y_true, y_pred, y_mask = [], [], []
@@ -17,7 +17,11 @@ def multi_eval_epoch(model, loader, drug_feat, device):
         mask_tmp = (mask > 0).to(device)
         tissue = tissue.to(device)
         with torch.no_grad():
-            outputs = model(x, drug_feat, tissue)
+            if getattr(model.encoder, 'use_domain_sep', False):
+                batch_domain_idx = torch.full((x.size(0),), domain_idx, dtype=torch.long, device=device) if domain_idx is not None else None
+            else:
+                batch_domain_idx = None
+            outputs = model(x, drug_feat, tissue, domain_idx=batch_domain_idx)
             yp = outputs[0].reshape(y.shape)
             yp = yp.reshape(y.shape)
             loss_mat = nn.BCEWithLogitsLoss(reduction='none')(yp, y.double())
@@ -50,5 +54,7 @@ def multi_eval_epoch(model, loader, drug_feat, device):
 def testing(model, t_dataloader, drug_feat, device):
     model.train(False)
     drug_feat = drug_feat.to(device)
-    test_loss, results, y_true, y_pred, y_mask = multi_eval_epoch(model=model, loader=t_dataloader, drug_feat=drug_feat, device=device)
+    # TCGA is target domain (domain_idx=1) for domain separation
+    domain_idx = 1 if getattr(model.encoder, 'use_domain_sep', False) else None
+    test_loss, results, y_true, y_pred, y_mask = multi_eval_epoch(model=model, loader=t_dataloader, drug_feat=drug_feat, device=device, domain_idx=domain_idx)
     return test_loss, results, y_true, y_pred, y_mask

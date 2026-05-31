@@ -99,7 +99,7 @@ def fusion_training_disentangle(
             fusion_model, train_dataloader, test_dataloader, drugs, drug_feat, kwargs["device"]
         )
         topk_sim, topk_idx = get_gene_feat_sim(
-            all_source_gene_feat, all_target_gene_feat, len(drugs), K
+            all_source_fusion_feat, all_target_fusion_feat, len(drugs), K
         )
         datasets = train_dataloader.dataset.tensors
         inputs, label, mask, tissue = datasets[0], datasets[1], datasets[2], datasets[3]

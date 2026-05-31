@@ -109,7 +109,7 @@ def fusion_model_train_step_with_contrastive(model, batch, drug_feat, device, op
     return loss
 
 
-def fusion_eval_epoch(model, loader, drug_feat, loss_fn, device):
+def fusion_eval_epoch(model, loader, drug_feat, loss_fn, device, domain_idx=None):
     y_true, y_pred, y_mask = [], [], []
     auc_list, aupr_list, f1_list, acc_list = [], [], [], []
     avg_loss = 0
@@ -118,7 +118,11 @@ def fusion_eval_epoch(model, loader, drug_feat, loss_fn, device):
         y = y.to(device)
         mask_tmp = (mask > 0).to(device)
         with torch.no_grad():
-            outputs = model(x, drug_feat, tissue)
+            if getattr(model.encoder, 'use_domain_sep', False) and domain_idx is not None:
+                batch_domain_idx = torch.full((x.size(0),), domain_idx, dtype=torch.long, device=device)
+            else:
+                batch_domain_idx = None
+            outputs = model(x, drug_feat, tissue, domain_idx=batch_domain_idx)
             yp = outputs[0].reshape(y.shape)
             loss_mat = loss_fn(yp, y.double())
             loss_mat = torch.where(mask_tmp, loss_mat,
@@ -184,10 +188,33 @@ def get_featuers(fusion_model, train_dataloader, test_dataloader, drugs, drug_fe
     return all_source_gene_feat, all_source_fusion_feat, all_target_gene_feat, all_target_fusion_feat
 
 
-def get_gene_feat_sim(all_source_gene_feat, all_target_gene_feat, drug_num, K):
-    sim = F.cosine_similarity(all_source_gene_feat.unsqueeze(1), all_target_gene_feat.unsqueeze(0), dim=-1)  # [N, M]
-    sim_matrix = sim.unsqueeze(1).expand(-1, drug_num, -1)  # [N, drug_num, M]
-    topk_sim, topk_idx = torch.topk(sim_matrix, K, dim=2)  # [N, drug_num, K]
+def get_gene_feat_sim(all_source_fusion_feat, all_target_fusion_feat, drug_num, K):
+    """
+    Per-drug KNN: compute similarity in each drug's fusion feature space independently.
+    Args:
+        all_source_fusion_feat: [N, drug_num, D]
+        all_target_fusion_feat: [M, drug_num, D]
+        drug_num: number of drugs
+        K: top-K neighbors
+    Returns:
+        topk_sim: [N, drug_num, K]
+        topk_idx: [N, drug_num, K]
+    """
+    N = all_source_fusion_feat.size(0)
+    device = all_source_fusion_feat.device
+
+    topk_sim = torch.zeros(N, drug_num, K, device=device)
+    topk_idx = torch.zeros(N, drug_num, K, dtype=torch.long, device=device)
+
+    for d in range(drug_num):
+        source_d = all_source_fusion_feat[:, d, :]  # [N, D]
+        target_d = all_target_fusion_feat[:, d, :]  # [M, D]
+
+        sim = F.cosine_similarity(source_d.unsqueeze(1), target_d.unsqueeze(0), dim=-1)  # [N, M]
+        sim_d, idx_d = torch.topk(sim, K, dim=1)  # [N, K]
+        topk_sim[:, d, :] = sim_d
+        topk_idx[:, d, :] = idx_d
+
     return topk_sim, topk_idx
 
 def fusion_taining(encoder, train_dataloader, val_dataloader, test_dataloader, drugs, gene_num, drug_feat, **kwargs):
@@ -230,7 +257,7 @@ def fusion_taining(encoder, train_dataloader, val_dataloader, test_dataloader, d
     K = kwargs['K']  # Top-K
     for con_epoch in range(kwargs['contrastive_num_epochs']):
         all_source_gene_feat, all_source_fusion_feat, all_target_gene_feat, all_target_fusion_feat = get_featuers(fusion_model, train_dataloader, test_dataloader, drugs, drug_feat, kwargs['device'])
-        topk_sim, topk_idx = get_gene_feat_sim(all_source_gene_feat, all_target_gene_feat, len(drugs), K)
+        topk_sim, topk_idx = get_gene_feat_sim(all_source_fusion_feat, all_target_fusion_feat, len(drugs), K)
         datasets = train_dataloader.dataset.tensors
         inputs, label, mask, tissue = datasets[0], datasets[1], datasets[2], datasets[3]
         sim_data = TensorDataset(inputs, label, mask, tissue, topk_sim, topk_idx)

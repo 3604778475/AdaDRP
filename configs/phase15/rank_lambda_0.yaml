@@ -1,0 +1,44 @@
+# Phase 15-B: lambda_rank = 0 control run
+# Purpose: verify that rank loss code path itself does not change baseline
+# Full baseline config reproduces ~0.6031 AUC
+
+# Stage 1/2/3 epochs
+pretrain_num_epochs: 300
+train_num_epochs: 100
+contrastive_num_epochs: 200
+K: 3
+
+# Backbone
+backbone_type: convnext1d
+convnext_depth: 1
+convnext_kernel_size: 7
+num_programs: 8
+program_dim: 64
+
+# MACB + Global FPI + CDAN + OT
+use_fpi: true
+use_cdan: true
+use_ot_alignment: true
+lambda_ot: 0.005
+
+# FPI parameters
+fpi_fragment_npz: data/drug_fragments_brics_m16_fp1024.npz
+fpi_gamma_max: 0.1
+fpi_gamma_init: 0.05
+fpi_q_prior_weight: 0.01
+lambda_fpi_gamma_l1: 0.0
+
+# Ranking loss (Phase 15-B)
+ranking:
+  enabled: true
+  type: pairwise_softplus
+  lambda_rank: 0.0
+  warmup_epochs: 0
+  source_only: true
+  use_raw_logits: true
+  per_drug_normalize_loss: true
+  min_pos: 1
+  min_neg: 1
+  log_grad_ratio: true
+  log_drugwise_pair_acc: true
+  log_interval: 50

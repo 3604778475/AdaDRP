@@ -45,13 +45,13 @@ def get_unlabeled_dataloaders(gex_features_df, seed, test_ratio, batch_size):
 
     # Construct the tensor dataset
     train_tcga_dataset = TensorDataset(torch.from_numpy(tcga_df.drop(columns='Tissue').values.astype('float32')),
-                                       torch.from_numpy(np.array(itemgetter(*tcga_df.Tissue)(config.tissue_map))))
+                                       torch.from_numpy(np.array(itemgetter(*tcga_df.Tissue)(config.tissue_map), dtype=np.int64)))
     train_ccle_dataset = TensorDataset(torch.from_numpy(ccle_df.drop(columns='Tissue').values.astype('float32')),
-                                       torch.from_numpy(np.array(itemgetter(*ccle_df.Tissue)(config.tissue_map))))
+                                       torch.from_numpy(np.array(itemgetter(*ccle_df.Tissue)(config.tissue_map), dtype=np.int64)))
     test_tcga_dateset = TensorDataset(torch.from_numpy(test_tcga_df.drop(columns='Tissue').values.astype('float32')),
-                                      torch.from_numpy(np.array(itemgetter(*test_tcga_df.Tissue)(config.tissue_map))))
+                                      torch.from_numpy(np.array(itemgetter(*test_tcga_df.Tissue)(config.tissue_map), dtype=np.int64)))
     test_ccle_dateset = TensorDataset(torch.from_numpy(test_ccle_df.drop(columns='Tissue').values.astype('float32')),
-                                      torch.from_numpy(np.array(itemgetter(*test_ccle_df.Tissue)(config.tissue_map))))
+                                      torch.from_numpy(np.array(itemgetter(*test_ccle_df.Tissue)(config.tissue_map), dtype=np.int64)))
 
     train_tcga_dataloader = DataLoader(train_tcga_dataset, batch_size=batch_size, shuffle=False)
     test_tcga_dataloader = DataLoader(test_tcga_dateset, batch_size=batch_size, shuffle=False)
@@ -185,13 +185,13 @@ def get_ccle_multi_labeled_dataloader(gex_features_df, batch_size, drug, seed, m
             torch.from_numpy(train_labeled_ccle_df.astype('float32')),
             torch.from_numpy(train_ccle_labels.astype('float32')),
             torch.from_numpy(train_ccle_mask.astype('float32')),
-            torch.from_numpy(train_ccle_tissue))
+            torch.from_numpy(train_ccle_tissue.astype(np.int64)))
 
         test_labeled_ccle_df = TensorDataset(
             torch.from_numpy(test_labeled_ccle_df.astype('float32')),
             torch.from_numpy(test_ccle_labels.astype('float32')),
             torch.from_numpy(test_ccle_mask.astype('float32')),
-            torch.from_numpy(test_ccle_tissue))
+            torch.from_numpy(test_ccle_tissue.astype(np.int64)))
 
         train_labeled_ccle_dataloader = DataLoader(train_labeled_ccle_dateset, batch_size=batch_size, shuffle=False)
         test_labeled_ccle_dataloader = DataLoader(test_labeled_ccle_df, batch_size=batch_size, shuffle=False)
@@ -226,7 +226,7 @@ def get_tcga_multi_labeled_dataloaders(gex_features_df, drug, batch_size):
     tcga_data = TensorDataset(torch.from_numpy(tcga_labeled_gex_feature_df.values.astype('float32')),
                               torch.from_numpy(tcga_labeled_df.values.astype('float32')),
                               torch.from_numpy(masked_labels.astype('float32')),
-                              torch.from_numpy(sample_tissue))
+                              torch.from_numpy(sample_tissue.astype(np.int64)))
     tcga_dataloader = DataLoader(tcga_data, batch_size=batch_size, shuffle=False)
 
     return tcga_dataloader

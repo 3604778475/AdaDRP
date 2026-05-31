@@ -11,8 +11,12 @@ def set_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
     if torch.cuda.device_count() > 0:
         torch.cuda.manual_seed_all(seed)
+    # 完全确定性设置（可选，会降低10-20%速度）
+    # os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+    # torch.use_deterministic_algorithms(True)
 
 def wrap_params(training_params, type='unlabeled'):
     aux_dict = {k: v for k, v in training_params.items() if k not in ['unlabeled', 'labeled']}
