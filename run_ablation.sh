@@ -15,10 +15,10 @@ echo "Logs saved to: $ABLA_LOG_DIR"
 echo "========================================"
 
 # ============================================================
-# Experiment 1: Original MACB Baseline
+# Experiment 1: Original MACB Baseline (original epochs: 300/100/200)
 # ============================================================
 echo ""
-echo "[1/8] Running Original MACB Baseline..."
+echo "[1/8] Running Original MACB Baseline (300/100/200 epochs)..."
 python main.py \
     --train \
     --measurement Z_SCORE \
