@@ -20,7 +20,7 @@ import torch.nn.functional as F
 from copy import deepcopy
 import config
 
-from mmpa_drp.backbones import GRNMLPBackbone, ConvNeXt1DBackbone
+from mmpa_drp.backbones import GRNMLPBackbone, ConvNeXt1DBackbone, ResNetBackbone
 from mmpa_drp.fragment_encoder import DrugFragmentEncoder
 from mmpa_drp.fpi import FragmentProgramInteraction
 
@@ -123,6 +123,16 @@ class MolecularProgramEncoder(nn.Module):
                 dropout=drop,
             )
             self.backbone_output_dim = grn_hidden
+
+        elif backbone_type == "resnet":
+            # Original MACB ResNet backbone for ablation
+            resnet_hidden_dims = hidden_dims if hidden_dims else [512, 256, 128, 64]
+            self.backbone = ResNetBackbone(
+                input_dim=input_dim,
+                hidden_dims=resnet_hidden_dims,
+                drop=drop,
+            )
+            self.backbone_output_dim = resnet_hidden_dims[-1]
 
         else:
             raise ValueError(f"Unknown backbone_type: {backbone_type}")

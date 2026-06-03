@@ -222,9 +222,9 @@ if __name__ == '__main__':
     #     "K": [1,3,5,7,9]
     # }
     params_grid = {
-        "pretrain_num_epochs": [300],
+        "pretrain_num_epochs": [100],
         "train_num_epochs": [100],
-        "contrastive_num_epochs": [200],
+        "contrastive_num_epochs": [100],
         "K": [7]
     }
 

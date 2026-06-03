@@ -122,7 +122,10 @@ def fusion_eval_epoch(model, loader, drug_feat, loss_fn, device, domain_idx=None
                 batch_domain_idx = torch.full((x.size(0),), domain_idx, dtype=torch.long, device=device)
             else:
                 batch_domain_idx = None
-            outputs = model(x, drug_feat, tissue, domain_idx=batch_domain_idx)
+            if batch_domain_idx is not None:
+                outputs = model(x, drug_feat, tissue, domain_idx=batch_domain_idx)
+            else:
+                outputs = model(x, drug_feat, tissue)
             yp = outputs[0].reshape(y.shape)
             loss_mat = loss_fn(yp, y.double())
             loss_mat = torch.where(mask_tmp, loss_mat,

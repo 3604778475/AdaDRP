@@ -271,3 +271,90 @@ class ConvNeXt1DBackbone(nn.Module):
         h = self.proj(h)   # [B, hidden_dim]
 
         return h
+
+
+class ResidualBlock(nn.Module):
+    """
+    Original MACB ResidualBlock.
+    Extracted from pretraining.py for use as a backbone in MolecularProgramEncoder.
+    """
+
+    def __init__(self, in_features, out_features, drop=0.2):
+        super(ResidualBlock, self).__init__()
+
+        self.block = nn.Sequential(
+            nn.Linear(in_features, out_features),
+            nn.BatchNorm1d(out_features),
+            nn.SELU(),
+            nn.Dropout(drop),
+            nn.Linear(out_features, out_features),
+            nn.BatchNorm1d(out_features),
+            nn.SELU(),
+            nn.Dropout(drop)
+        )
+
+        self.shortcut = nn.Sequential()
+        if in_features != out_features:
+            self.shortcut = nn.Sequential(
+                nn.Linear(in_features, out_features),
+                nn.BatchNorm1d(out_features)
+            )
+
+    def forward(self, x):
+        residual = self.shortcut(x)
+        out = self.block(x)
+        out += residual
+        return F.selu(out)
+
+
+class ResNetBackbone(nn.Module):
+    """
+    Original MACB ResNet backbone for ablation study.
+    Mirrors the feature extraction path of ResNetTissueClassifier
+    (input_layer + res_blocks) without the attention/classifier heads.
+
+    Default hidden_dims=[512, 256, 128, 64] matches original MACB.
+    Output: [B, hidden_dims[-1]]
+    """
+
+    def __init__(
+        self,
+        input_dim: int,
+        hidden_dims=None,
+        drop: float = 0.2,
+    ):
+        super().__init__()
+        self.input_dim = input_dim
+        if hidden_dims is None:
+            hidden_dims = [512, 256, 128, 64]
+        self.hidden_dims = hidden_dims
+
+        self.input_layer = nn.Sequential(
+            nn.Linear(input_dim, hidden_dims[0]),
+            nn.BatchNorm1d(hidden_dims[0]),
+            nn.SELU(),
+            nn.Dropout(drop)
+        )
+
+        self.res_blocks = nn.ModuleList()
+        for i in range(len(hidden_dims) - 1):
+            self.res_blocks.append(
+                ResidualBlock(hidden_dims[i], hidden_dims[i + 1], drop)
+            )
+
+        self._reset_parameters()
+
+    def _reset_parameters(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+
+    def forward(self, x: torch.Tensor):
+        # x: [B, G]
+        h = self.input_layer(x)
+        for block in self.res_blocks:
+            h = block(h)
+        # h: [B, hidden_dims[-1]]
+        return h

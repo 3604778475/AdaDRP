@@ -1060,7 +1060,7 @@ if __name__ == '__main__':
     parser.add_argument('--lambda_migrate', type=float, default=0.01, help='Stage 2: migration loss weight (private learns from reliable shared)')
 
     # Phase 5: Backbone selection (ConvNeXt V2-inspired)
-    parser.add_argument('--backbone_type', type=str, default='convnext1d', choices=['mlp', 'grn_mlp', 'convnext1d'], help='Backbone type for MolecularProgramEncoder')
+    parser.add_argument('--backbone_type', type=str, default='convnext1d', choices=['mlp', 'grn_mlp', 'convnext1d', 'resnet'], help='Backbone type for MolecularProgramEncoder')
     parser.add_argument('--norm_type', type=str, default='layernorm', choices=['layernorm', 'batchnorm'], help='Normalization type for GRN-MLP')
     parser.add_argument('--num_gene_tokens', type=int, default=64, help='Number of gene tokens for ConvNeXt1D tokenizer')
     parser.add_argument('--token_dim', type=int, default=64, help='Token dimension for ConvNeXt1D')
