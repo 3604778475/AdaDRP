@@ -180,6 +180,9 @@ class GeneSetSemanticSelectorEncoder(nn.Module):
         program_names: list = None,
         use_query_gate: bool = False,
         lambda_query_gate_l1: float = 0.01,
+        use_domain_sep: bool = False,
+        domain_sep_hidden_dim: int = 256,
+        domain_sep_output_dim: int = None,
     ):
         super().__init__()
         self.input_dim = input_dim
@@ -189,6 +192,7 @@ class GeneSetSemanticSelectorEncoder(nn.Module):
         self.dropout = dropout
         self.use_query_gate = use_query_gate
         self.lambda_query_gate_l1 = lambda_query_gate_l1
+        self.use_domain_sep = use_domain_sep
 
         # Gene-set encoder: produces P=16 semantic tokens
         self.gene_set_encoder = GeneSetMaskProgramEncoder(
@@ -232,6 +236,20 @@ class GeneSetSemanticSelectorEncoder(nn.Module):
         )
 
         self.activation_proj = nn.Linear(program_dim, 1)
+
+        # Domain separation on pooled representation
+        if use_domain_sep:
+            # Delayed import to avoid circular dependency (models.py imports pathway_encoder)
+            from mmpa_drp.models import DomainSeparatedEncoder
+            self.domain_sep = DomainSeparatedEncoder(
+                input_dim=program_dim,
+                hidden_dim=domain_sep_hidden_dim,
+                output_dim=domain_sep_output_dim or program_dim,
+                num_domains=2,
+                drop=dropout,
+            )
+        else:
+            self.domain_sep = None
 
         self._reset_parameters()
 
@@ -302,7 +320,7 @@ class GeneSetSemanticSelectorEncoder(nn.Module):
         # 7. Pooled representation
         h = (q.unsqueeze(-1) * z).sum(dim=1)  # [B, H]
 
-        return {
+        result = {
             "z": z,
             "q": q,
             "h": h,
@@ -314,6 +332,15 @@ class GeneSetSemanticSelectorEncoder(nn.Module):
             "query_gate": query_gate,
             "query_gate_loss": query_gate_loss,
         }
+
+        # 8. Domain separation on pooled representation
+        if self.use_domain_sep and self.domain_sep is not None:
+            h_shared, h_private, domain_logits = self.domain_sep(h, domain_idx=domain_idx)
+            result["h_shared"] = h_shared
+            result["h_private"] = h_private
+            result["domain_logits"] = domain_logits
+
+        return result
 
 
 class HybridGeneSetLatentProgramEncoder(nn.Module):

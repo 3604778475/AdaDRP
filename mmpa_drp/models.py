@@ -618,6 +618,9 @@ class ProgramTissueClassifier(nn.Module):
                 program_names=gene_set_names,
                 use_query_gate=use_query_gate,
                 lambda_query_gate_l1=lambda_query_gate_l1,
+                use_domain_sep=use_domain_sep,
+                domain_sep_hidden_dim=domain_sep_hidden_dim,
+                domain_sep_output_dim=domain_sep_output_dim,
             )
         else:
             raise ValueError(f"Unknown program_encoder_type: {program_encoder_type}")
