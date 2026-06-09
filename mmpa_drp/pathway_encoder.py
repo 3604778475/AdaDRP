@@ -178,6 +178,8 @@ class GeneSetSemanticSelectorEncoder(nn.Module):
         selector_num_heads: int = 4,
         selector_dropout: float = 0.1,
         program_names: list = None,
+        use_query_gate: bool = False,
+        lambda_query_gate_l1: float = 0.01,
     ):
         super().__init__()
         self.input_dim = input_dim
@@ -185,6 +187,8 @@ class GeneSetSemanticSelectorEncoder(nn.Module):
         self.num_programs = num_final_programs
         self.num_gene_sets = gene_set_mask.size(0)
         self.dropout = dropout
+        self.use_query_gate = use_query_gate
+        self.lambda_query_gate_l1 = lambda_query_gate_l1
 
         # Gene-set encoder: produces P=16 semantic tokens
         self.gene_set_encoder = GeneSetMaskProgramEncoder(
@@ -202,6 +206,12 @@ class GeneSetSemanticSelectorEncoder(nn.Module):
         self.program_queries = nn.Parameter(
             torch.randn(num_final_programs, program_dim) * 0.02
         )
+
+        # Query gate: learnable per-query activation (for dynamic K)
+        if use_query_gate:
+            self.query_gate_logits = nn.Parameter(torch.zeros(num_final_programs))
+        else:
+            self.query_gate_logits = None
 
         # Cross-attention selector: queries -> gene-set tokens
         self.selector_attn = nn.MultiheadAttention(
@@ -258,6 +268,14 @@ class GeneSetSemanticSelectorEncoder(nn.Module):
         B = x.size(0)
         queries = self.program_queries.unsqueeze(0).expand(B, -1, -1)  # [B, K, H]
 
+        # 2.5 Query gate: learnable per-query activation
+        query_gate = None
+        query_gate_loss = torch.tensor(0.0, device=x.device)
+        if self.use_query_gate and self.query_gate_logits is not None:
+            query_gate = torch.sigmoid(self.query_gate_logits)  # [K]
+            queries = query_gate.unsqueeze(0).unsqueeze(-1) * queries  # [B, K, H]
+            query_gate_loss = self.lambda_query_gate_l1 * query_gate.sum()
+
         # 3. Cross-attention: queries attend to gene-set tokens
         selected, attn_weights = self.selector_attn(
             query=queries,
@@ -293,6 +311,8 @@ class GeneSetSemanticSelectorEncoder(nn.Module):
             "gene_set_tokens": Zg,
             "gene_set_q": gene_out.get("q", None),
             "selector_attn": selector_attn,
+            "query_gate": query_gate,
+            "query_gate_loss": query_gate_loss,
         }
 
 

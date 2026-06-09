@@ -1,0 +1,55 @@
+\textbf{ConvNeXt1D 主干网络。}
+为了从高维基因表达谱中获得更具结构性的表示，本文采用轻量级 ConvNeXt1D 作为基因表达编码器。给定输入基因表达矩阵 $\mathbf{x}\in\mathbb{R}^{B\times G}$，其中 $B$ 表示批大小，$G$ 表示基因数量，模型首先通过可学习的 tokenizer 将每个样本投影为一组潜在基因令牌序列，随后沿令牌维度进行深度可分离一维卷积与 LayerNorm 归一化：
+\begin{equation}
+    \tilde{\mathbf{T}}
+    =
+    \mathrm{LN}
+    \left(
+    \mathrm{DWConv1D}
+    \left(
+    \mathrm{Reshape}
+    \left(
+    \mathbf{x}\mathbf{W}_{\mathrm{tok}}+\mathbf{b}_{\mathrm{tok}}
+    \right)
+    \right)
+    \right)
+    \in \mathbb{R}^{B\times L\times C},
+\end{equation}
+其中 $L$ 表示潜在基因令牌数量，$C$ 表示每个令牌的特征维度，$\mathrm{DWConv1D}(\cdot)$ 表示分组数等于通道数的深度可分离一维卷积（kernel size $k=7$），其参数量仅为标准卷积的 $1/C$。
+
+随后，模型采用 inverted bottleneck 结构对每个令牌进行高维非线性变换。具体而言，通过逐点线性层将通道维度从 $C$ 扩展至 $\rho C$，依次经 GELU 激活与全局响应归一化（GRN）以均衡通道响应幅度、抑制特征坍塌，再通过逐点线性层压缩回原始维度 $C$，并经 Dropout 后与输入建立残差连接：
+\begin{equation}
+    \mathbf{T}_{\mathrm{out}}
+    =
+    \tilde{\mathbf{T}}
+    +
+    \mathrm{Dropout}
+    \left(
+    \mathrm{Linear}_{\rho C\to C}
+    \left(
+    \mathrm{GRN}
+    \left(
+    \mathrm{GELU}
+    \left(
+    \mathrm{Linear}_{C\to\rho C}(\tilde{\mathbf{T}})
+    \right)
+    \right)
+    \right)
+    \right).
+\end{equation}
+
+在堆叠若干 ConvNeXt1D block 后，模型对输出令牌沿序列维度进行平均池化、LayerNorm 与线性投影，得到最终的隐藏表示：
+\begin{equation}
+    \mathbf{h}
+    =
+    \mathrm{LN}
+    \left(
+    \frac{1}{L}
+    \sum_{\ell=1}^{L}
+    \mathbf{T}_{\mathrm{out},\ell}
+    \right)
+    \mathbf{W}_{\mathrm{proj}}
+    \in
+    \mathbb{R}^{B\times H}.
+\end{equation}
+所得 $\mathbf{h}$ 被输入至分子程序编码器，用于生成 $K$ 个分子程序令牌及其激活权重。在本文实现中，设置 $L=64$，$C=64$，$H=64$，$k=7$，$\rho=4$，并默认使用单层 ConvNeXt1D block。

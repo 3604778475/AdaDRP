@@ -1,0 +1,107 @@
+\textbf{FPI Residual Branch.}
+The base gene--drug fusion predictor produces a coarse response logit for each sample--drug pair. 
+To further capture fine-grained pharmacological effects, we introduce a Fragment-Program Interaction (FPI) residual branch, which models interactions between molecular program tokens and drug substructure fragments.
+
+Consider a batch of $B$ samples and a panel of $D$ drugs. 
+For sample $i \in \{1,\dots,B\}$ and drug $d \in \{1,\dots,D\}$, let 
+$\mathbf{Z}_i=\{\mathbf{z}_{i,k}\}_{k=1}^{K}$ denote the $K=8$ molecular program tokens of sample $i$ (each $\mathbf{z}_{i,k} \in \mathbb{R}^{H}$ with $H=64$), 
+$\mathbf{q}_i=\{q_{i,k}\}_{k=1}^{K}$ denote the corresponding program activation weights ($q_{i,k} \in [0,1]$, $\sum_k q_{i,k}=1$), and 
+$\mathbf{R}_d=\{\mathbf{r}_{d,m}\}_{m=1}^{M}$ denote the $M=16$ BRICS fragment embeddings of drug $d$ (each $\mathbf{r}_{d,m} \in \mathbb{R}^{H}$, zero-padded to fixed length).
+
+We first project program tokens and fragments into a common space of dimension $H$:
+\begin{equation}
+    \tilde{\mathbf{z}}_{i,k} = \mathbf{W}_p \mathbf{z}_{i,k}, \quad
+    \tilde{\mathbf{r}}_{d,m} = \mathbf{W}_f \mathbf{r}_{d,m},
+\end{equation}
+where $\mathbf{W}_p, \mathbf{W}_f \in \mathbb{R}^{H \times H}$ are learnable projection matrices.
+
+The interaction score $s_{i,d,k,m}$ between the $k$-th program of sample $i$ and the $m$-th fragment of drug $d$ is computed as:
+\begin{equation}
+    s_{i,d,k,m}
+    =
+    \frac{
+    \tilde{\mathbf{z}}_{i,k}^{\top}
+    \tilde{\mathbf{r}}_{d,m}
+    }{\sqrt{H}}
+    +
+    \lambda_q \log(q_{i,k}+\epsilon),
+\end{equation}
+where the first term measures the scaled dot-product similarity between the projected program and fragment, and the second term ($\lambda_q=0.01$, $\epsilon=10^{-8}$) incorporates the program activation prior, biasing attention toward programs with high base activation $q_{i,k}$.
+
+Padding fragments (where the binary mask $\text{mask}_{d,m}=0$) are masked with $-\infty$ before normalization. The attention weight $\alpha_{i,d,k,m} \in [0,1]$ for each valid program--fragment pair is computed by softmax over all valid pairs:
+\begin{equation}
+    \alpha_{i,d,k,m}
+    =
+    \frac{
+    \exp(s_{i,d,k,m})
+    }{
+    \sum_{k'=1}^{K}
+    \sum_{m' \in \mathcal{M}_d}
+    \exp(s_{i,d,k',m'})
+    },
+\end{equation}
+where $\mathcal{M}_d = \{m' \mid \text{mask}_{d,m'}=1\}$ denotes the set of non-padding fragments for drug $d$.
+
+For each program--fragment pair, we construct the pairwise interaction feature $\mathbf{v}_{i,d,k,m} \in \mathbb{R}^{H}$ by concatenation and element-wise product:
+\begin{equation}
+    \mathbf{v}_{i,d,k,m}
+    =
+    \phi
+    \left(
+    [
+    \mathbf{z}_{i,k};
+    \mathbf{r}_{d,m};
+    \mathbf{z}_{i,k}\odot\mathbf{r}_{d,m}
+    ]
+    \right),
+\end{equation}
+where $[\cdot;\cdot]$ denotes feature concatenation along the last dimension, $\odot$ denotes element-wise multiplication, and $\phi(\cdot)$ is a two-layer MLP with GELU activation, dropout, and LayerNorm, mapping from $\mathbb{R}^{3H}$ to $\mathbb{R}^{H}$.
+
+The drug-specific FPI representation $\mathbf{u}_{i,d} \in \mathbb{R}^{H}$ is obtained by attention-weighted aggregation over all program--fragment pairs:
+\begin{equation}
+    \mathbf{u}_{i,d}
+    =
+    \sum_{k=1}^{K}
+    \sum_{m=1}^{M}
+    \alpha_{i,d,k,m}
+    \mathbf{v}_{i,d,k,m}.
+\end{equation}
+
+The residual response logit $\Delta \hat{y}_{i,d} \in [-1, 1]$ is then predicted from the FPI representation:
+\begin{equation}
+    \Delta \hat{y}_{i,d}
+    =
+    \tanh
+    \left(
+    \mathbf{w}_{\mathrm{out}}^{\top}
+    \mathrm{GELU}
+    \left(
+    \mathbf{W}_{\mathrm{res}} \mathbf{u}_{i,d}
+    \right)
+    \right),
+\end{equation}
+where $\mathbf{W}_{\mathrm{res}} \in \mathbb{R}^{H \times H}$ and $\mathbf{w}_{\mathrm{out}} \in \mathbb{R}^{H}$ are parameters of the residual prediction head. The head is initialized with small weights (std=$10^{-3}$) and zero bias, ensuring $\Delta \hat{y}_{i,d} \approx 0$ at the beginning of training.
+
+Finally, the final response logit $\hat{y}_{i,d} \in \mathbb{R}$ is obtained by adding the FPI residual correction to the base response logit $\hat{y}_{i,d}^{\mathrm{base}}$:
+\begin{equation}
+    \hat{y}_{i,d}
+    =
+    \hat{y}_{i,d}^{\mathrm{base}}
+    +
+    \gamma_d
+    \cdot
+    \Delta \hat{y}_{i,d},
+    \quad
+    \text{with}
+    \quad
+    \gamma_d = \sigma(\tilde{\gamma}_d) \cdot \gamma_{\max},
+\end{equation}
+where $\tilde{\gamma}_d \in \mathbb{R}$ is a learnable raw parameter for drug $d$, $\sigma(\cdot)$ is the sigmoid function, and $\gamma_{\max}=0.1$ is the maximum gating value. The drug-specific coefficient $\gamma_d \in [0, \gamma_{\max}]$ controls the strength of the FPI residual branch, initialized to $\gamma_d \approx 0.05$ at startup.
+
+The final response probability $p_{i,d} \in [0,1]$ is computed as:
+\begin{equation}
+    p_{i,d} = \sigma\left(\hat{y}_{i,d}\right),
+\end{equation}
+where $\sigma(\cdot)$ is the sigmoid function.
+
+Rather than replacing the base predictor, the FPI branch acts as a \emph{drug-specific residual correction module}, refining the base response logit through fine-grained fragment--program interactions while the gating mechanism $\gamma_d$ prevents over-perturbation.

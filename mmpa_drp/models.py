@@ -490,6 +490,8 @@ class ProgramTissueClassifier(nn.Module):
         gene_set_num_final_programs: int = 3,
         selector_num_heads: int = 4,
         selector_dropout: float = 0.1,
+        use_query_gate: bool = False,
+        lambda_query_gate_l1: float = 0.01,
     ):
         super(ProgramTissueClassifier, self).__init__()
 
@@ -614,6 +616,8 @@ class ProgramTissueClassifier(nn.Module):
                 selector_num_heads=selector_num_heads,
                 selector_dropout=selector_dropout,
                 program_names=gene_set_names,
+                use_query_gate=use_query_gate,
+                lambda_query_gate_l1=lambda_query_gate_l1,
             )
         else:
             raise ValueError(f"Unknown program_encoder_type: {program_encoder_type}")

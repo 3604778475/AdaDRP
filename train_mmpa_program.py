@@ -647,6 +647,8 @@ def main(args, update_params_dict, now_time):
         gene_set_num_final_programs=args.gene_set_num_final_programs,
         selector_num_heads=args.selector_num_heads,
         selector_dropout=args.selector_dropout,
+        use_query_gate=args.use_query_gate,
+        lambda_query_gate_l1=args.lambda_query_gate_l1,
     ).to(device)
 
     # pre-training
@@ -1150,6 +1152,10 @@ if __name__ == '__main__':
                         help='Number of attention heads for gene-set selector')
     parser.add_argument('--selector_dropout', type=float, default=0.1,
                         help='Dropout for gene-set selector attention')
+    parser.add_argument('--use_query_gate', action='store_true', default=False,
+                        help='Enable learnable query gate for dynamic effective K')
+    parser.add_argument('--lambda_query_gate_l1', type=float, default=0.01,
+                        help='L1 sparsity regularization for query gate')
 
     train_group = parser.add_mutually_exclusive_group(required=False)
     train_group.add_argument('--train', dest='retrain_flag', action='store_true')
