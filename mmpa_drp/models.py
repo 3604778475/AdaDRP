@@ -14,6 +14,8 @@ Phase 5: Added backbone_type support (mlp / grn_mlp / convnext1d)
 """
 
 import math
+import os
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -23,6 +25,13 @@ import config
 from mmpa_drp.backbones import GRNMLPBackbone, ConvNeXt1DBackbone, ResNetBackbone
 from mmpa_drp.fragment_encoder import DrugFragmentEncoder
 from mmpa_drp.fpi import FragmentProgramInteraction
+from mmpa_drp.graph_drug_encoder import GraphTransformerDrugEncoder
+from mmpa_drp.pretrained_drug_encoder import build_pretrained_drug_encoder
+from mmpa_drp.pathway_encoder import (
+    GeneSetMaskProgramEncoder,
+    HybridGeneSetLatentProgramEncoder,
+    GeneSetSemanticSelectorEncoder,
+)
 
 
 class MolecularProgramEncoder(nn.Module):
@@ -343,6 +352,46 @@ class PseudoDomainGuide(nn.Module):
         }
 
 
+class UniMolDrugEncoder(nn.Module):
+    """
+    Uni-Mol offline feature projector.
+    Loads pre-computed Uni-Mol embeddings [D, 512] and projects to model dim.
+    Drop-in replacement for Drug_MLP when use_unimol_drug=True.
+    """
+
+    def __init__(self, unimol_dim=512, output_dim=64, hidden_dim=256, drop=0.1):
+        super(UniMolDrugEncoder, self).__init__()
+        self.unimol_dim = unimol_dim
+        self.output_dim = output_dim
+
+        self.projector = nn.Sequential(
+            nn.Linear(unimol_dim, hidden_dim),
+            nn.LayerNorm(hidden_dim),
+            nn.GELU(),
+            nn.Dropout(drop),
+            nn.Linear(hidden_dim, output_dim),
+        )
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+
+    def forward(self, drug_unimol_feat):
+        """
+        Args:
+            drug_unimol_feat: [D, unimol_dim]
+        Returns:
+            output: [D, output_dim]
+            embed:  [D, output_dim]  (same as output, for Drug_MLP compatibility)
+        """
+        output = self.projector(drug_unimol_feat)
+        return output, output
+
+
 class DrugMechanismGate(nn.Module):
     """
     Produce a drug-specific mechanism gate over K molecular programs.
@@ -429,26 +478,148 @@ class ProgramTissueClassifier(nn.Module):
         use_domain_sep: bool = False,
         domain_sep_hidden_dim: int = 256,
         domain_sep_output_dim: int = None,
+        # Hallmark gene-set encoder config
+        program_encoder_type: str = "latent",
+        gene_set_mask_path: str = None,
+        gene_set_names_path: str = None,
+        gene_set_token_dropout: float = 0.1,
+        use_pathway_embedding: bool = True,
+        use_soft_gene_set_mask: bool = False,
+        soft_mask_scale: float = 0.05,
+        latent_num_programs: int = 3,
+        gene_set_num_final_programs: int = 3,
+        selector_num_heads: int = 4,
+        selector_dropout: float = 0.1,
     ):
         super(ProgramTissueClassifier, self).__init__()
-        self.program_encoder = MolecularProgramEncoder(
-            input_dim=input_dim,
-            num_programs=num_programs,
-            program_dim=program_dim,
-            hidden_dims=hidden_dims,
-            drop=drop,
-            act_fn=act_fn,
-            backbone_type=backbone_type,
-            norm_type=norm_type,
-            num_gene_tokens=num_gene_tokens,
-            token_dim=token_dim,
-            convnext_depth=convnext_depth,
-            convnext_kernel_size=convnext_kernel_size,
-            convnext_expansion=convnext_expansion,
-            use_domain_sep=use_domain_sep,
-            domain_sep_hidden_dim=domain_sep_hidden_dim,
-            domain_sep_output_dim=domain_sep_output_dim,
-        )
+
+        # Helper to load gene-set mask (supports .npy and .pt)
+        def _load_gene_set_mask(path):
+            import numpy as np
+            if path.endswith(".npy"):
+                return torch.from_numpy(np.load(path)).float()
+            else:
+                return torch.load(path, map_location="cpu").float()
+
+        # Load gene set names if available
+        gene_set_names = None
+        if gene_set_names_path is not None and os.path.exists(gene_set_names_path):
+            with open(gene_set_names_path, "r", encoding="utf-8") as f:
+                gene_set_names = [line.strip() for line in f if line.strip()]
+        self.gene_set_names = gene_set_names
+
+        # Build encoder according to program_encoder_type
+        if program_encoder_type == "latent":
+            self.program_encoder = MolecularProgramEncoder(
+                input_dim=input_dim,
+                num_programs=num_programs,
+                program_dim=program_dim,
+                hidden_dims=hidden_dims,
+                drop=drop,
+                act_fn=act_fn,
+                backbone_type=backbone_type,
+                norm_type=norm_type,
+                num_gene_tokens=num_gene_tokens,
+                token_dim=token_dim,
+                convnext_depth=convnext_depth,
+                convnext_kernel_size=convnext_kernel_size,
+                convnext_expansion=convnext_expansion,
+                use_domain_sep=use_domain_sep,
+                domain_sep_hidden_dim=domain_sep_hidden_dim,
+                domain_sep_output_dim=domain_sep_output_dim,
+            )
+        elif program_encoder_type == "gene_set_mask":
+            if gene_set_mask_path is None or not os.path.exists(gene_set_mask_path):
+                raise ValueError(
+                    f"program_encoder_type='gene_set_mask' requires valid gene_set_mask_path, "
+                    f"got: {gene_set_mask_path}"
+                )
+            gene_set_mask = torch.load(gene_set_mask_path, map_location="cpu")
+            # Load gene set names if available
+            program_names = None
+            if gene_set_names_path is not None and os.path.exists(gene_set_names_path):
+                with open(gene_set_names_path, "r", encoding="utf-8") as f:
+                    program_names = [line.strip() for line in f if line.strip()]
+            self.program_encoder = GeneSetMaskProgramEncoder(
+                input_dim=input_dim,
+                gene_set_mask=gene_set_mask,
+                program_dim=program_dim,
+                dropout=gene_set_token_dropout,
+                use_pathway_embedding=use_pathway_embedding,
+                use_soft_mask=use_soft_gene_set_mask,
+                soft_mask_scale=soft_mask_scale,
+                program_names=program_names,
+            )
+        elif program_encoder_type == "hybrid_gene_set_latent":
+            if gene_set_mask_path is None or not os.path.exists(gene_set_mask_path):
+                raise ValueError(
+                    f"program_encoder_type='hybrid_gene_set_latent' requires valid gene_set_mask_path, "
+                    f"got: {gene_set_mask_path}"
+                )
+            gene_set_mask = torch.load(gene_set_mask_path, map_location="cpu")
+            # Load gene set names if available
+            program_names = None
+            if gene_set_names_path is not None and os.path.exists(gene_set_names_path):
+                with open(gene_set_names_path, "r", encoding="utf-8") as f:
+                    program_names = [line.strip() for line in f if line.strip()]
+            gene_set_encoder = GeneSetMaskProgramEncoder(
+                input_dim=input_dim,
+                gene_set_mask=gene_set_mask,
+                program_dim=program_dim,
+                dropout=gene_set_token_dropout,
+                use_pathway_embedding=use_pathway_embedding,
+                use_soft_mask=use_soft_gene_set_mask,
+                soft_mask_scale=soft_mask_scale,
+                program_names=program_names,
+            )
+            latent_encoder = MolecularProgramEncoder(
+                input_dim=input_dim,
+                num_programs=latent_num_programs,
+                program_dim=program_dim,
+                hidden_dims=hidden_dims,
+                drop=drop,
+                act_fn=act_fn,
+                backbone_type=backbone_type,
+                norm_type=norm_type,
+                num_gene_tokens=num_gene_tokens,
+                token_dim=token_dim,
+                convnext_depth=convnext_depth,
+                convnext_kernel_size=convnext_kernel_size,
+                convnext_expansion=convnext_expansion,
+                use_domain_sep=use_domain_sep,
+                domain_sep_hidden_dim=domain_sep_hidden_dim,
+                domain_sep_output_dim=domain_sep_output_dim,
+            )
+            self.program_encoder = HybridGeneSetLatentProgramEncoder(
+                gene_set_encoder=gene_set_encoder,
+                latent_encoder=latent_encoder,
+                program_dim=program_dim,
+            )
+        elif program_encoder_type == "gene_set_selector":
+            if gene_set_mask_path is None or not os.path.exists(gene_set_mask_path):
+                raise ValueError(
+                    f"program_encoder_type='gene_set_selector' requires valid gene_set_mask_path, "
+                    f"got: {gene_set_mask_path}"
+                )
+            gene_set_mask = _load_gene_set_mask(gene_set_mask_path)
+            self.program_encoder = GeneSetSemanticSelectorEncoder(
+                input_dim=input_dim,
+                gene_set_mask=gene_set_mask,
+                program_dim=program_dim,
+                num_final_programs=gene_set_num_final_programs,
+                dropout=gene_set_token_dropout,
+                use_pathway_embedding=use_pathway_embedding,
+                use_soft_mask=use_soft_gene_set_mask,
+                soft_mask_scale=soft_mask_scale,
+                selector_num_heads=selector_num_heads,
+                selector_dropout=selector_dropout,
+                program_names=gene_set_names,
+            )
+        else:
+            raise ValueError(f"Unknown program_encoder_type: {program_encoder_type}")
+
+        print(f"[ProgramTissueClassifier] program_encoder_type={program_encoder_type}, "
+              f"num_programs={self.program_encoder.num_programs}")
         self.use_domain_sep = use_domain_sep
         feat_dim = (domain_sep_output_dim or program_dim) if use_domain_sep else program_dim
 
@@ -483,7 +654,10 @@ class ProgramTissueClassifier(nn.Module):
     def forward(self, x, alpha=1.0, domain_idx=None):
         out = self.program_encoder(x, domain_idx=domain_idx)
 
-        if self.use_domain_sep:
+        # Save selector attention for interpretability
+        self.last_selector_attn = out.get("selector_attn", None)
+
+        if self.use_domain_sep and "h_shared" in out:
             h = out["h_shared"]  # [B, d_sep]
             self.last_domain_sep_out = {
                 "h_shared": out["h_shared"],
@@ -1565,6 +1739,46 @@ class CrossAttentionFusion(nn.Module):
         return z, attn_weights
 
 
+class UniMolDrugProjection(nn.Module):
+    """
+    Projection head for offline Uni-Mol embeddings.
+    Uni-Mol encoder is NOT loaded; only this lightweight MLP is trainable.
+    """
+
+    def __init__(self, unimol_dim, drug_emb_dim=64, dropout=0.1):
+        super().__init__()
+        self.proj = nn.Sequential(
+            nn.Linear(unimol_dim, drug_emb_dim),
+            nn.LayerNorm(drug_emb_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(drug_emb_dim, drug_emb_dim),
+        )
+
+    def forward(self, unimol_emb):
+        return self.proj(unimol_emb)
+
+
+class DrugEmbeddingFusion(nn.Module):
+    """
+    Fuse Drug_MLP output and Uni-Mol projection output.
+    """
+
+    def __init__(self, drug_emb_dim=64, dropout=0.1):
+        super().__init__()
+        self.fusion = nn.Sequential(
+            nn.Linear(drug_emb_dim * 2, drug_emb_dim),
+            nn.LayerNorm(drug_emb_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(drug_emb_dim, drug_emb_dim),
+        )
+
+    def forward(self, r_fp, r_uni):
+        x = torch.cat([r_fp, r_uni], dim=-1)
+        return self.fusion(x)
+
+
 class ProgramFusionMLP(nn.Module):
     """
     Stage 2/3 drop-in replacement for Fusion_MLP.
@@ -1637,10 +1851,29 @@ class ProgramFusionMLP(nn.Module):
         # Phase DCDA: Drug-Conditioned Domain Diffusion Alignment
         use_dcda=False,
         dcda_config=None,
+        # Uni-Mol drug encoder
+        use_unimol_drug=False,
+        unimol_dim=512,
+        unimol_hidden_dim=256,
+        # Graph Transformer drug encoder
+        use_graph_transformer_drug=False,
+        smiles_list=None,
+        # Pretrained drug encoder (ChemBERTa / ECFP)
+        use_pretrained_drug=False,
+        pretrained_drug_type="chemberta",
+        # Unified drug encoder interface (Uni-Mol / MLP / Fusion)
+        drug_encoder_type="mlp",
+        unimol_emb_path=None,
+        drug_emb_dim=64,
+        drug_fusion_dropout=0.1,
         **kwargs,
     ):
         super(ProgramFusionMLP, self).__init__()
         self.encoder = encoder
+        # Dynamic num_programs from encoder (supports gene_set_mask / hybrid)
+        num_programs = getattr(encoder, 'num_programs', num_programs)
+        self.num_programs = num_programs
+        self.program_names = getattr(encoder, 'program_names', None)
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.drug_num = drug_num
@@ -1734,12 +1967,95 @@ class ProgramFusionMLP(nn.Module):
         # (which triggers dataload -> rdkit chain at import time)
         from models import FeatMLP, Drug_MLP
 
-        self.drug_mlp = Drug_MLP(
-            input_dim=128,
-            output_dim=64,
-            hidden_dims=[128, 64],
-            drop=0.1,
+        if use_pretrained_drug:
+            if smiles_list is None:
+                raise ValueError("use_pretrained_drug=True requires smiles_list")
+            self.drug_mlp = build_pretrained_drug_encoder(
+                smiles_list=smiles_list,
+                encoder_type=pretrained_drug_type,
+                output_dim=64,
+            )
+        elif use_graph_transformer_drug:
+            if smiles_list is None:
+                raise ValueError("use_graph_transformer_drug=True requires smiles_list")
+            self.drug_mlp = GraphTransformerDrugEncoder(
+                smiles_list=smiles_list,
+                num_features_xd=78,
+                n_heads_gat=10,
+                output_dim=64,
+                dropout=0.2,
+            )
+        elif use_unimol_drug:
+            self.drug_mlp = UniMolDrugEncoder(
+                unimol_dim=unimol_dim,
+                output_dim=64,
+                hidden_dim=unimol_hidden_dim,
+                drop=0.1,
+            )
+        else:
+            self.drug_mlp = Drug_MLP(
+                input_dim=128,
+                output_dim=64,
+                hidden_dims=[128, 64],
+                drop=0.1,
+            )
+
+        # ============================================================
+        # Unified Drug Encoder: mlp / unimol / fp_unimol_fusion
+        # ============================================================
+        self.drug_encoder_type = drug_encoder_type
+        self.drug_emb_dim = drug_emb_dim
+        self.unimol_proj = None
+        self.drug_fusion = None
+        self.drug_unimol_emb = None
+
+        if self.drug_encoder_type in ("unimol", "fp_unimol_fusion"):
+            if unimol_emb_path is None:
+                raise ValueError(
+                    f"drug_encoder_type='{self.drug_encoder_type}' requires unimol_emb_path, got None"
+                )
+            if not os.path.exists(unimol_emb_path):
+                raise ValueError(
+                    f"Uni-Mol embedding file not found: {unimol_emb_path}\n"
+                    f"Please run: python extract_unimol_embeddings.py to generate it."
+                )
+            unimol_np = np.load(unimol_emb_path).astype(np.float32)
+            if unimol_np.ndim != 2:
+                raise ValueError(
+                    f"Uni-Mol embedding must be 2D, got shape {unimol_np.shape}"
+                )
+            if unimol_np.shape[0] != drug_num:
+                raise ValueError(
+                    f"Uni-Mol embedding drug number mismatch: expected {drug_num}, got {unimol_np.shape[0]}"
+                )
+            if unimol_np.shape[1] != unimol_dim:
+                raise ValueError(
+                    f"Uni-Mol embedding dimension mismatch: expected {unimol_dim}, got {unimol_np.shape[1]}"
+                )
+
+            self.register_buffer(
+                "drug_unimol_emb", torch.from_numpy(unimol_np)
+            )
+            self.unimol_proj = UniMolDrugProjection(
+                unimol_dim=unimol_dim,
+                drug_emb_dim=drug_emb_dim,
+                dropout=drug_fusion_dropout,
+            )
+            if self.drug_encoder_type == "fp_unimol_fusion":
+                self.drug_fusion = DrugEmbeddingFusion(
+                    drug_emb_dim=drug_emb_dim,
+                    dropout=drug_fusion_dropout,
+                )
+
+        print(
+            f"[Drug Encoder] type={self.drug_encoder_type}, "
+            f"drug_feat_dim={drug_feat_dim}, drug_emb_dim={drug_emb_dim}"
         )
+        if self.drug_unimol_emb is not None:
+            print(
+                f"[Drug Encoder] drug_unimol_emb shape={self.drug_unimol_emb.shape}, "
+                f"requires_grad={self.drug_unimol_emb.requires_grad}"
+            )
 
         # Phase 3B: drug gate
         if self.use_drug_gate:
@@ -2032,6 +2348,41 @@ class ProgramFusionMLP(nn.Module):
             self.bml_router = BMLReliabilityRouter(hidden_dim=16)
             self.last_domain_sep_pred = None
 
+    def encode_drug(self, drug_feat):
+        """
+        Unified drug encoding interface.
+        Supports: mlp, unimol, fp_unimol_fusion.
+        Output shape: [drug_num, drug_emb_dim]
+        """
+        if self.drug_encoder_type == "mlp":
+            r_fp, _ = self.drug_mlp(drug_feat)
+            drug_emb = r_fp
+        elif self.drug_encoder_type == "unimol":
+            r_uni = self.unimol_proj(self.drug_unimol_emb)
+            drug_emb = r_uni
+        elif self.drug_encoder_type == "fp_unimol_fusion":
+            r_fp, _ = self.drug_mlp(drug_feat)
+            r_uni = self.unimol_proj(self.drug_unimol_emb)
+            drug_emb = self.drug_fusion(r_fp, r_uni)
+        else:
+            raise ValueError(f"Unknown drug_encoder_type: {self.drug_encoder_type}")
+
+        drug_emb = F.normalize(drug_emb, p=2, dim=1)
+
+        # Log once on first call
+        if not hasattr(self, "_drug_enc_logged"):
+            self._drug_enc_logged = True
+            print(f"[Drug Encoder] drug_feat shape={drug_feat.shape}")
+            if self.drug_unimol_emb is not None:
+                print(f"[Drug Encoder] drug_unimol_emb shape={self.drug_unimol_emb.shape}, requires_grad={self.drug_unimol_emb.requires_grad}")
+            if self.drug_encoder_type in ("mlp", "fp_unimol_fusion"):
+                print(f"[Drug Encoder] r_fp shape={r_fp.shape}")
+            if self.drug_encoder_type in ("unimol", "fp_unimol_fusion"):
+                print(f"[Drug Encoder] r_uni shape={r_uni.shape}")
+            print(f"[Drug Encoder] final drug_emb shape={drug_emb.shape}")
+
+        return drug_emb
+
     def forward(self, inputs, drug_feat, tissue_idx, alpha=1.0, return_encoder_out=False, return_fused_feature=False, return_dict=False, frag_fp=None, frag_mask=None, frag_smiles=None, current_epoch=None, drug_names=None, domain_idx=None):
         if tissue_idx is None:
             attention_weights = self.attention_activation(
@@ -2045,8 +2396,7 @@ class ProgramFusionMLP(nn.Module):
         inputs = inputs * attention_weights
         encoder_out = self.encoder(inputs, domain_idx=domain_idx)
 
-        drug_feat_mlp, _ = self.drug_mlp(drug_feat)  # [drug_num, D]
-        drug_feat_mlp = F.normalize(drug_feat_mlp, p=2, dim=1)
+        drug_feat_mlp = self.encode_drug(drug_feat)  # [drug_num, D]
 
         # Phase 18: Domain-separated fast path
         if self.use_domain_sep:
@@ -2349,6 +2699,11 @@ class ProgramFusionMLP(nn.Module):
 
             # Store for diagnostics
             self.last_fpi_out = fpi_out
+            # Add selector attention for gene_set_selector interpretability
+            if "selector_attn" in encoder_out:
+                self.last_fpi_out["selector_attn"] = encoder_out["selector_attn"]
+                self.last_fpi_out["gene_set_names"] = getattr(self.encoder, "gene_set_names", None)
+                self.last_fpi_out["final_program_names"] = getattr(self.encoder, "program_names", None) or [f"PROGRAM_{i}" for i in range(getattr(self.encoder, "num_programs", 3))]
 
         # Phase 9-R: FPI Router
         router_out = None
@@ -2425,6 +2780,11 @@ class ProgramFusionMLP(nn.Module):
                 result["fpi_out"] = fpi_out
             if self.use_fpi_router and router_out is not None:
                 result["router_out"] = router_out
+            # Gene-set selector interpretability
+            if "selector_attn" in encoder_out:
+                result["selector_attn"] = encoder_out["selector_attn"]
+                result["gene_set_names"] = getattr(self.encoder, "gene_set_names", None)
+                result["final_program_names"] = getattr(self.encoder, "program_names", None) or [f"PROGRAM_{i}" for i in range(getattr(self.encoder, "num_programs", 3))]
             if self.use_pdg and self.last_pdg_assign is not None:
                 result["pdg_assign"] = self.last_pdg_assign
                 result["pdg_sim"] = self.last_pdg_sim
@@ -2999,10 +3359,29 @@ class DisentangledProgramFusionMLP(nn.Module):
         act_fn=nn.SELU,
         use_cross_attn=False,
         cross_attn_num_heads=4,
+        # Uni-Mol drug encoder
+        use_unimol_drug=False,
+        unimol_dim=512,
+        unimol_hidden_dim=256,
+        # Graph Transformer drug encoder
+        use_graph_transformer_drug=False,
+        smiles_list=None,
+        # Pretrained drug encoder
+        use_pretrained_drug=False,
+        pretrained_drug_type="chemberta",
+        # Unified drug encoder interface (Uni-Mol / MLP / Fusion)
+        drug_encoder_type="mlp",
+        unimol_emb_path=None,
+        drug_emb_dim=64,
+        drug_fusion_dropout=0.1,
         **kwargs,
     ):
         super(DisentangledProgramFusionMLP, self).__init__()
         self.encoder = encoder
+        # Dynamic num_programs from encoder (supports gene_set_mask / hybrid)
+        num_programs = getattr(encoder, 'num_programs', num_programs)
+        self.num_programs = num_programs
+        self.program_names = getattr(encoder, 'program_names', None)
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.drug_num = drug_num
@@ -3018,12 +3397,95 @@ class DisentangledProgramFusionMLP(nn.Module):
         # Lazy import to avoid pulling in the full original model graph
         from models import FeatMLP, Drug_MLP
 
-        self.drug_mlp = Drug_MLP(
-            input_dim=128,
-            output_dim=64,
-            hidden_dims=[128, 64],
-            drop=0.1,
+        if use_pretrained_drug:
+            if smiles_list is None:
+                raise ValueError("use_pretrained_drug=True requires smiles_list")
+            self.drug_mlp = build_pretrained_drug_encoder(
+                smiles_list=smiles_list,
+                encoder_type=pretrained_drug_type,
+                output_dim=64,
+            )
+        elif use_graph_transformer_drug:
+            if smiles_list is None:
+                raise ValueError("use_graph_transformer_drug=True requires smiles_list")
+            self.drug_mlp = GraphTransformerDrugEncoder(
+                smiles_list=smiles_list,
+                num_features_xd=78,
+                n_heads_gat=10,
+                output_dim=64,
+                dropout=0.2,
+            )
+        elif use_unimol_drug:
+            self.drug_mlp = UniMolDrugEncoder(
+                unimol_dim=unimol_dim,
+                output_dim=64,
+                hidden_dim=unimol_hidden_dim,
+                drop=0.1,
+            )
+        else:
+            self.drug_mlp = Drug_MLP(
+                input_dim=128,
+                output_dim=64,
+                hidden_dims=[128, 64],
+                drop=0.1,
+            )
+
+        # ============================================================
+        # Unified Drug Encoder: mlp / unimol / fp_unimol_fusion
+        # ============================================================
+        self.drug_encoder_type = drug_encoder_type
+        self.drug_emb_dim = drug_emb_dim
+        self.unimol_proj = None
+        self.drug_fusion = None
+        self.drug_unimol_emb = None
+
+        if self.drug_encoder_type in ("unimol", "fp_unimol_fusion"):
+            if unimol_emb_path is None:
+                raise ValueError(
+                    f"drug_encoder_type='{self.drug_encoder_type}' requires unimol_emb_path, got None"
+                )
+            if not os.path.exists(unimol_emb_path):
+                raise ValueError(
+                    f"Uni-Mol embedding file not found: {unimol_emb_path}\n"
+                    f"Please run: python extract_unimol_embeddings.py to generate it."
+                )
+            unimol_np = np.load(unimol_emb_path).astype(np.float32)
+            if unimol_np.ndim != 2:
+                raise ValueError(
+                    f"Uni-Mol embedding must be 2D, got shape {unimol_np.shape}"
+                )
+            if unimol_np.shape[0] != drug_num:
+                raise ValueError(
+                    f"Uni-Mol embedding drug number mismatch: expected {drug_num}, got {unimol_np.shape[0]}"
+                )
+            if unimol_np.shape[1] != unimol_dim:
+                raise ValueError(
+                    f"Uni-Mol embedding dimension mismatch: expected {unimol_dim}, got {unimol_np.shape[1]}"
+                )
+
+            self.register_buffer(
+                "drug_unimol_emb", torch.from_numpy(unimol_np)
+            )
+            self.unimol_proj = UniMolDrugProjection(
+                unimol_dim=unimol_dim,
+                drug_emb_dim=drug_emb_dim,
+                dropout=drug_fusion_dropout,
+            )
+            if self.drug_encoder_type == "fp_unimol_fusion":
+                self.drug_fusion = DrugEmbeddingFusion(
+                    drug_emb_dim=drug_emb_dim,
+                    dropout=drug_fusion_dropout,
+                )
+
+        print(
+            f"[Drug Encoder] type={self.drug_encoder_type}, "
+            f"drug_feat_dim={drug_feat_dim}, drug_emb_dim={drug_emb_dim}"
         )
+        if self.drug_unimol_emb is not None:
+            print(
+                f"[Drug Encoder] drug_unimol_emb shape={self.drug_unimol_emb.shape}, "
+                f"requires_grad={self.drug_unimol_emb.requires_grad}"
+            )
 
         self.bilinear = nn.Bilinear(gene_feat_dim, drug_feat_dim, bilinear_dim)
 
@@ -3054,6 +3516,40 @@ class DisentangledProgramFusionMLP(nn.Module):
             nn.Linear(hidden_dims[-1] // 2, drug_num),
         )
 
+    def encode_drug(self, drug_feat):
+        """
+        Unified drug encoding interface.
+        Supports: mlp, unimol, fp_unimol_fusion.
+        Output shape: [drug_num, drug_emb_dim]
+        """
+        if self.drug_encoder_type == "mlp":
+            r_fp, _ = self.drug_mlp(drug_feat)
+            drug_emb = r_fp
+        elif self.drug_encoder_type == "unimol":
+            r_uni = self.unimol_proj(self.drug_unimol_emb)
+            drug_emb = r_uni
+        elif self.drug_encoder_type == "fp_unimol_fusion":
+            r_fp, _ = self.drug_mlp(drug_feat)
+            r_uni = self.unimol_proj(self.drug_unimol_emb)
+            drug_emb = self.drug_fusion(r_fp, r_uni)
+        else:
+            raise ValueError(f"Unknown drug_encoder_type: {self.drug_encoder_type}")
+
+        drug_emb = F.normalize(drug_emb, p=2, dim=1)
+
+        if not hasattr(self, "_drug_enc_logged"):
+            self._drug_enc_logged = True
+            print(f"[Drug Encoder] drug_feat shape={drug_feat.shape}")
+            if self.drug_unimol_emb is not None:
+                print(f"[Drug Encoder] drug_unimol_emb shape={self.drug_unimol_emb.shape}, requires_grad={self.drug_unimol_emb.requires_grad}")
+            if self.drug_encoder_type in ("mlp", "fp_unimol_fusion"):
+                print(f"[Drug Encoder] r_fp shape={r_fp.shape}")
+            if self.drug_encoder_type in ("unimol", "fp_unimol_fusion"):
+                print(f"[Drug Encoder] r_uni shape={r_uni.shape}")
+            print(f"[Drug Encoder] final drug_emb shape={drug_emb.shape}")
+
+        return drug_emb
+
     def forward(self, inputs, drug_feat, tissue_idx, alpha=1.0):
         if tissue_idx is None:
             attention_weights = self.attention_activation(
@@ -3069,8 +3565,7 @@ class DisentangledProgramFusionMLP(nn.Module):
         gene_feat = encoder_out["h_pred"]  # <-- Phase 3A: use h_pred
         gene_feat = F.normalize(gene_feat, p=2, dim=1)
 
-        drug_feat, _ = self.drug_mlp(drug_feat)
-        drug_feat = F.normalize(drug_feat, p=2, dim=1)
+        drug_feat = self.encode_drug(drug_feat)
 
         gene_feat_expand = gene_feat.unsqueeze(1).expand(
             -1, self.drug_num, -1

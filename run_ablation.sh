@@ -90,7 +90,7 @@ python train_mmpa_program.py \
     --use_fpi --fpi_gamma_max 0.1 --fpi_gamma_init 0.05 --fpi_q_prior_weight 0.01 \
     --fpi_dropout 0.1 --fpi_m_max 16 --fpi_fp_dim 1024 --lambda_fpi_gamma_l1 0.001 \
     --fpi_detach_mode none \
-    --pretrain_num_epochs 100 --train_num_epochs 100 --contrastive_num_epochs 100 \
+    --pretrain_num_epochs 300 --train_num_epochs 100 --contrastive_num_epochs 200 \
     > "$ABLA_LOG_DIR/exp04_no_domain_sep.log" 2>&1
 
 echo "[4/8] No DomainSep completed at $(date)"
@@ -134,7 +134,7 @@ python train_mmpa_program.py \
     --use_fpi --fpi_gamma_max 0.1 --fpi_gamma_init 0.05 --fpi_q_prior_weight 0.01 \
     --fpi_dropout 0.1 --fpi_m_max 16 --fpi_fp_dim 1024 --lambda_fpi_gamma_l1 0.001 \
     --fpi_detach_mode none \
-    --pretrain_num_epochs 100 --train_num_epochs 100 --contrastive_num_epochs 100 \
+    --pretrain_num_epochs 300 --train_num_epochs 100 --contrastive_num_epochs 200 \
     > "$ABLA_LOG_DIR/exp06_resnet_backbone.log" 2>&1
 
 echo "[6/8] ResNet Backbone completed at $(date)"

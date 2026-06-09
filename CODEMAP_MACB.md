@@ -19,7 +19,40 @@ python main.py \
   --beta 0.3 \
   --train
 ```
+300/100/200
+5-fold average/std results: 
+5-Fluorouracil    auc: 0.5202/0.0434 | aupr: 0.6762/0.0287 | f1: 0.5245/0.0281 | acc: 0.5965/0.0268
+Cisplatin         auc: 0.6761/0.0450 | aupr: 0.8317/0.0381 | f1: 0.7036/0.0264 | acc: 0.7955/0.0228
+Cyclophosphamide  auc: 0.6570/0.0679 | aupr: 0.9461/0.0199 | f1: 0.5741/0.1433 | acc: 0.6946/0.1366
+Docetaxel         auc: 0.4000/0.0720 | aupr: 0.6346/0.0485 | f1: 0.4063/0.0655 | acc: 0.4441/0.1125
+Doxorubicin       auc: 0.4076/0.0980 | aupr: 0.6895/0.0540 | f1: 0.3296/0.0698 | acc: 0.3367/0.1138
+Etoposide         auc: 0.7833/0.0616 | aupr: 0.9275/0.0229 | f1: 0.8167/0.0433 | acc: 0.8872/0.0319
+Gemcitabine       auc: 0.5936/0.0228 | aupr: 0.5721/0.0439 | f1: 0.5826/0.0263 | acc: 0.5494/0.0532
+Paclitaxel        auc: 0.4697/0.0240 | aupr: 0.6905/0.0105 | f1: 0.4685/0.0431 | acc: 0.5400/0.0773
+Temozolomide      auc: 0.6146/0.0628 | aupr: 0.4302/0.0385 | f1: 0.7448/0.0266 | acc: 0.2686/0.1547
+4 metrics average/std results: 5-Fluorouracil: 0.5794/0.0717 | Cisplatin: 0.7517/0.0727 | Cyclophosphamide: 0.7180/0.1719 | Docetaxel: 0.4713/0.1217 | Doxorubicin: 0.4408/0.1705 | Etoposide: 0.8537/0.0701 | Gemcitabine: 0.5744/0.0392 | Paclitaxel: 0.5422/0.1019 | Temozolomide: 0.5145/0.2018
+auc&aupr average/std results: 5-Fluorouracil: 0.5982/0.0892 | Cisplatin: 0.7539/0.0909 | Cyclophosphamide: 0.8016/0.1595 | Docetaxel: 0.5173/0.1365 | Doxorubicin: 0.5486/0.1663 | Etoposide: 0.8554/0.0877 | Gemcitabine: 0.5829/0.0349 | Paclitaxel: 0.5801/0.1176 | Temozolomide: 0.5224/0.1089
+auc：0.5691/0.1350  aupr：0.7109/0.1625  acc：0.5681/0.2115  f1：0.5723/0.1636
+all_metrics：0.6051/0.1792
+auc_aupr_metrics：0.6400/0.1638
 
+
+100/100/100
+5-fold average/std results: 
+5-Fluorouracil    auc: 0.5192/0.0161 | aupr: 0.6682/0.0167 | f1: 0.5136/0.0161 | acc: 0.5705/0.0433
+Cisplatin         auc: 0.6572/0.0325 | aupr: 0.8104/0.0188 | f1: 0.6763/0.0477 | acc: 0.7695/0.0462
+Cyclophosphamide  auc: 0.6512/0.0458 | aupr: 0.9377/0.0128 | f1: 0.5788/0.2209 | acc: 0.6827/0.2001
+Docetaxel         auc: 0.3797/0.0482 | aupr: 0.6129/0.0371 | f1: 0.3874/0.0457 | acc: 0.4439/0.1012
+Doxorubicin       auc: 0.4456/0.0493 | aupr: 0.7235/0.0299 | f1: 0.3711/0.0670 | acc: 0.4036/0.1167
+Etoposide         auc: 0.7741/0.0310 | aupr: 0.9315/0.0211 | f1: 0.8021/0.0423 | acc: 0.8772/0.0309
+Gemcitabine       auc: 0.6067/0.0244 | aupr: 0.5947/0.0263 | f1: 0.5617/0.0220 | acc: 0.5415/0.0580
+Paclitaxel        auc: 0.4713/0.0265 | aupr: 0.6954/0.0153 | f1: 0.4883/0.0508 | acc: 0.5814/0.0820
+Temozolomide      auc: 0.5181/0.1040 | aupr: 0.3252/0.0964 | f1: 0.6851/0.0890 | acc: 0.2101/0.1480
+4 metrics average/std results: 5-Fluorouracil: 0.5679/0.0679 | Cisplatin: 0.7284/0.0741 | Cyclophosphamide: 0.7126/0.1961 | Docetaxel: 0.4560/0.1125 | Doxorubicin: 0.4859/0.1583 | Etoposide: 0.8462/0.0702 | Gemcitabine: 0.5762/0.0423 | Paclitaxel: 0.5591/0.1026 | Temozolomide: 0.4346/0.2128
+auc&aupr average/std results: 5-Fluorouracil: 0.5937/0.0801 | Cisplatin: 0.7338/0.0845 | Cyclophosphamide: 0.7945/0.1543 | Docetaxel: 0.4963/0.1294 | Doxorubicin: 0.5846/0.1514 | Etoposide: 0.8528/0.0867 | Gemcitabine: 0.6007/0.0247 | Paclitaxel: 0.5834/0.1198 | Temozolomide: 0.4217/0.1388
+auc：0.5581/0.1259  aupr：0.7000/0.1828  acc：0.5645/0.2135  f1：0.5627/0.1572
+all_metrics：0.5963/0.1811
+auc_aupr_metrics：0.6290/0.1706
 参数说明见 `main.py` argparse。训练参数默认值在 `train_params.json` 中定义。
 
 ---
@@ -40,6 +73,7 @@ python train_mmpa_program.py \
   --lambda_div 0.01 \
   --lambda_sparse 0.001
 ```
+
 
 MMPA 专属参数：
 - `--num_programs`: 分子程序数量（默认 8），即 `MolecularProgramEncoder` 输出的 program tokens 个数
@@ -2415,6 +2449,45 @@ auc&aupr average/std results: 5-Fluorouracil: 0.6735/0.0647 | Cisplatin: 0.7465/
 auc：0.6188/0.0908  aupr：0.7561/0.1517  acc：0.6678/0.2181  f1：0.6560/0.1076
 all_metrics：0.6747/0.1570
 auc_aupr_metrics：0.6875/0.1414
+
+ --beta 0.1
+ python train_mmpa_program.py
+--measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5 --train
+--backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7
+--num_programs 8 --program_dim 64 --K 3
+--use_ot_alignment --lambda_ot 0.005 --ot_reg 0.1
+--ot_cost_type cosine --ot_marginal_type uniform
+--use_cdan
+--use_domain_sep --domain_sep_hidden_dim 256 --domain_sep_output_dim 64
+--lambda_ortho 0.001 --lambda_recon 0.005 --lambda_private_domain 0.005 --lambda_migrate 0.01
+--alph 1.4 --beta 0.1
+--use_fpi --fpi_gamma_max 0.1 --fpi_gamma_init 0.05 --fpi_q_prior_weight 0.01
+--fpi_dropout 0.1 --fpi_m_max 16 --fpi_fp_dim 1024 --lambda_fpi_gamma_l1 0.001
+--fpi_detach_mode none
+--pretrain_num_epochs 100 --train_num_epochs 100 --contrastive_num_epochs 100
+ 0 1 2 3 4 drug metric
+5-Fluorouracil auc 0.5313 0.6517 0.5985 0.7506 0.6219 aupr 0.6418 0.7371 0.7098 0.8220 0.7233 f1 0.5909 0.6136 0.6273 0.6773 0.6136 acc 0.7256 0.6743 0.7405 0.7760 0.7447 Cisplatin auc 0.6119 0.6656 0.6470 0.6869 0.6505 aupr 0.8126 0.8457 0.8359 0.8526 0.8292 f1 0.7218 0.7122 0.7098 0.7074 0.7098 acc 0.8263 0.8193 0.8141 0.8051 0.8153 Cyclophosphamide auc 0.6112 0.7002 0.6972 0.7230 0.7049 aupr 0.9406 0.9555 0.9558 0.9640 0.9578 f1 0.7765 0.8765 0.8529 0.8647 0.7941 acc 0.8716 0.9333 0.9180 0.9260 0.8805 Docetaxel auc 0.5256 0.4660 0.5405 0.6387 0.5685 aupr 0.7115 0.6853 0.7187 0.7905 0.7566 f1 0.5975 0.4528 0.5975 0.6981 0.5849 acc 0.7311 0.4596 0.7217 0.8110 0.7130 Doxorubicin auc 0.5939 0.5508 0.6355 0.6332 0.5981 aupr 0.8468 0.8196 0.8516 0.8494 0.8372 f1 0.6415 0.4277 0.6792 0.6981 0.6164 acc 0.7692 0.4348 0.7811 0.8140 0.7382 Etoposide auc 0.6711 0.7969 0.7672 0.8000 0.6539 aupr 0.8912 0.9548 0.9180 0.9386 0.8648 f1 0.8542 0.7396 0.8438 0.8542 0.8438 acc 0.9186 0.8227 0.9112 0.9125 0.9080 Gemcitabine auc 0.5530 0.5739 0.5792 0.6090 0.5733 aupr 0.5860 0.5541 0.6086 0.6139 0.5727 f1 0.4696 0.5304 0.5174 0.5783 0.5478 acc 0.6039 0.3647 0.5934 0.6421 0.5517 Paclitaxel auc 0.5597 0.5252 0.5495 0.5917 0.5491 aupr 0.7332 0.7140 0.7461 0.7705 0.7110 f1 0.6351 0.5541 0.6802 0.6847 0.6892 acc 0.7718 0.6400 0.7977 0.8023 0.8023 Temozolomide auc 0.6479 0.5768 0.6656 0.6229 0.5203 aupr 0.4838 0.3125 0.5340 0.4591 0.4079 f1 0.7463 0.7463 0.7612 0.7537 0.7612 acc 0.0556 0.0000 0.1579 0.0571 0.1111
+
+5-fold average/std results: 5-Fluorouracil auc: 0.6308/0.0803 | aupr: 0.7268/0.0646 | f1: 0.6245/0.0322 | acc: 0.7322/0.0372 Cisplatin auc: 0.6524/0.0275 | aupr: 0.8352/0.0155 | f1: 0.7122/0.0056 | acc: 0.8160/0.0078 Cyclophosphamide auc: 0.6873/0.0437 | aupr: 0.9548/0.0086 | f1: 0.8329/0.0447 | acc: 0.9059/0.0279 Docetaxel auc: 0.5479/0.0631 | aupr: 0.7325/0.0413 | f1: 0.5862/0.0874 | acc: 0.6873/0.1331 Doxorubicin auc: 0.6023/0.0346 | aupr: 0.8409/0.0131 | f1: 0.6126/0.1082 | acc: 0.7075/0.1548 Etoposide auc: 0.7378/0.0702 | aupr: 0.9135/0.0362 | f1: 0.8271/0.0492 | acc: 0.8946/0.0404 Gemcitabine auc: 0.5777/0.0201 | aupr: 0.5871/0.0249 | f1: 0.5287/0.0402 | acc: 0.5512/0.1091 Paclitaxel auc: 0.5551/0.0241 | aupr: 0.7350/0.0245 | f1: 0.6486/0.0572 | acc: 0.7628/0.0698 Temozolomide auc: 0.6067/0.0587 | aupr: 0.4395/0.0842 | f1: 0.7537/0.0075 | acc: 0.0763/0.0602 4 metrics average/std results: 5-Fluorouracil: 0.6786/0.0741 | Cisplatin: 0.7540/0.0784 | Cyclophosphamide: 0.8452/0.1083 | Docetaxel: 0.6385/0.1112 | Doxorubicin: 0.6908/0.1322 | Etoposide: 0.8432/0.0846 | Gemcitabine: 0.5611/0.0601 | Paclitaxel: 0.6754/0.0944 | Temozolomide: 0.4691/0.2648 auc&aupr average/std results:5-Fluorouracil: 0.6788/0.0853 | Cisplatin: 0.7438/0.0986 | Cyclophosphamide: 0.8210/0.1441 | Docetaxel: 0.6402/0.1095 | Doxorubicin: 0.7216/0.1282 | Etoposide: 0.8256/0.1065 | Gemcitabine: 0.5824/0.0219 | Paclitaxel: 0.6450/0.0976 | Temozolomide: 0.5231/0.1116 auc：0.6220/0.0755 aupr：0.7517/0.1585 acc：0.6815/0.2522 f1：0.6807/0.1146 all_metrics：0.6840/0.1685 auc_aupr_metrics：0.6868/0.1388 
+
+
+ python train_mmpa_program.py --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5 --train --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7 --num_programs 8 --program_dim 64 --K 3 --use_ot_alignment --lambda_ot 0.005 --ot_reg 0.1 --ot_cost_type cosine --ot_marginal_type uniform --use_cdan --use_domain_sep --domain_sep_hidden_dim 256 --domain_sep_output_dim 64 --lambda_ortho 0.001 --lambda_recon 0.005 --lambda_private_domain 0.005 --lambda_migrate 0.01 --alph 1.4 --beta 0.066 --use_fpi --fpi_gamma_max 0.1 --fpi_gamma_init 0.05 --fpi_q_prior_weight 0.01 --fpi_dropout 0.1 --fpi_m_max 16 --fpi_fp_dim 1024 --lambda_fpi_gamma_l1 0.001 --fpi_detach_mode none --pretrain_num_epochs 100 --train_num_epochs 100 --contrastive_num_epochs 100
+
+5-fold average/std results: 
+5-Fluorouracil    auc: 0.6500/0.0589 | aupr: 0.7449/0.0489 | f1: 0.6509/0.0403 | acc: 0.7458/0.0322
+Cisplatin         auc: 0.6423/0.0373 | aupr: 0.8261/0.0257 | f1: 0.6739/0.0295 | acc: 0.7802/0.0311
+Cyclophosphamide  auc: 0.6979/0.0279 | aupr: 0.9519/0.0120 | f1: 0.8259/0.0339 | acc: 0.9010/0.0219
+Docetaxel         auc: 0.5637/0.0541 | aupr: 0.7434/0.0392 | f1: 0.6101/0.0585 | acc: 0.7299/0.0588
+Doxorubicin       auc: 0.6025/0.0665 | aupr: 0.8418/0.0289 | f1: 0.6428/0.0517 | acc: 0.7586/0.0484
+Etoposide         auc: 0.7722/0.0652 | aupr: 0.9283/0.0260 | f1: 0.8479/0.0240 | acc: 0.9105/0.0168
+Gemcitabine       auc: 0.5761/0.0257 | aupr: 0.5752/0.0326 | f1: 0.5313/0.0291 | acc: 0.5964/0.0352
+Paclitaxel        auc: 0.5873/0.0295 | aupr: 0.7641/0.0217 | f1: 0.6649/0.0145 | acc: 0.7859/0.0108
+Temozolomide      auc: 0.6239/0.0075 | aupr: 0.4633/0.0421 | f1: 0.7493/0.0085 | acc: 0.1300/0.1702
+4 metrics average/std results: 5-Fluorouracil: 0.6979/0.0645 | Cisplatin: 0.7306/0.0822 | Cyclophosphamide: 0.8442/0.1008 | Docetaxel: 0.6617/0.0927 | Doxorubicin: 0.7114/0.1076 | Etoposide: 0.8647/0.0718 | Gemcitabine: 0.5697/0.0374 | Paclitaxel: 0.7005/0.0839 | Temozolomide: 0.4916/0.2514
+auc&aupr average/std results: 5-Fluorouracil: 0.6974/0.0715 | Cisplatin: 0.7342/0.1015 | Cyclophosphamide: 0.8249/0.1354 | Docetaxel: 0.6535/0.1047 | Doxorubicin: 0.7221/0.1351 | Etoposide: 0.8503/0.0947 | Gemcitabine: 0.5756/0.0277 | Paclitaxel: 0.6757/0.0963 | Temozolomide: 0.5436/0.0893
+auc：0.6351/0.0755  aupr：0.7599/0.1532  acc：0.7042/0.2315  f1：0.6885/0.1024
+all_metrics：0.6969/0.1574
+auc_aupr_metrics：0.6975/0.1347
 *****************************************************
 
 ## 18.在stage1阶段在现有模型基础上利用对比和对抗学习分析出shared domain和private domain（无药物参与），借鉴DCD的分离方法，在stage2仅使用shareddomain与药物进行交互，借鉴BML，将shared domain对drug的学习迁移到private domain中对齐
@@ -2458,5 +2531,19 @@ Private	域特异，初始随机，通过迁移学习 shared 的可靠预测
 BML Router	动态判断哪个 domain 在当前样本上更可靠
 L_migrate	知识蒸馏：shared 的可靠预测 → private 的监督
 BML Router 是动态融合，因为它的权重不是固定的，而是通过 MLP 根据每个样本-药物对的预测可靠性（entropy + agreement）实时计算出来的。同一个样本对不同药物、不同样本对同一种药物，权重都可以不同。                     
+
+
+代码已上传到  https://github.com/3604778475/mmpa
+
+关于你提到的结果文件和数据文件不需要推送，当前 .gitignore 已配置如下：
+
+类型	状态	说明
+logs/	✅ 已忽略	实验日志
+results/	✅ 已忽略	5-fold 输出结果
+outputs/	✅ 已忽略	实验输出
+data/preprocessed/	✅ 刚添加忽略	大数据 CSV
+*.npy / *.npz	✅ 已忽略	特征文件
+*.pt / *.pth	✅ 已忽略	模型权重
+但 data/raw_dat/ 和 data/TCGA_labels.csv 仍在仓库中（它们不大，且是原始数据索引，通常需要保留以便复现）。如果你也想忽略整个 data/ 目录，告诉我，我可以再加一行
 
 

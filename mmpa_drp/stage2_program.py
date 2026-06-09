@@ -1398,6 +1398,19 @@ def fusion_training_program(
     lambda_selector_entropy = kwargs.get('lambda_selector_entropy', 0.0)
     lambda_selector_div = kwargs.get('lambda_selector_div', 0.0)
 
+    # Pretrained / Graph Transformer drug encoder parameters
+    use_pretrained_drug = kwargs.get('use_pretrained_drug', False)
+    pretrained_drug_type = kwargs.get('pretrained_drug_type', 'chemberta')
+    use_graph_transformer_drug = kwargs.get('use_graph_transformer_drug', False)
+    smiles_list = kwargs.get('smiles_list', None)
+
+    # Unified drug encoder parameters (Uni-Mol / MLP / Fusion)
+    drug_encoder_type = kwargs.get('drug_encoder_type', 'mlp')
+    unimol_emb_path = kwargs.get('unimol_emb_path', None)
+    unimol_dim = kwargs.get('unimol_dim', 512)
+    drug_emb_dim = kwargs.get('drug_emb_dim', 64)
+    drug_fusion_dropout = kwargs.get('drug_fusion_dropout', 0.1)
+
     # Phase 9: FPI parameters
     use_fpi = kwargs.get('use_fpi', False)
     fpi_config = kwargs.get('fpi_config', None)
@@ -1747,6 +1760,17 @@ def fusion_training_program(
         # Phase DCDA
         use_dcda=use_dcda,
         dcda_config=dcda_config,
+        # Pretrained / Graph Transformer drug encoder
+        use_pretrained_drug=use_pretrained_drug,
+        pretrained_drug_type=pretrained_drug_type,
+        use_graph_transformer_drug=use_graph_transformer_drug,
+        smiles_list=smiles_list,
+        # Unified drug encoder (Uni-Mol / MLP / Fusion)
+        drug_encoder_type=drug_encoder_type,
+        unimol_emb_path=unimol_emb_path,
+        unimol_dim=unimol_dim,
+        drug_emb_dim=drug_emb_dim,
+        drug_fusion_dropout=drug_fusion_dropout,
     ).to(kwargs["device"])
 
     # Phase 9-R Diagnosis: two-stage cross compensation

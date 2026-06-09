@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import json
 import argparse
@@ -583,7 +584,38 @@ def main(args, update_params_dict, now_time):
     # Data construction for the pre-training
     s_dataloaders, t_dataloaders = get_unlabeled_dataloaders(gex_features_df=gex_features_df, seed=seed, test_ratio=0.25,
                                                                     batch_size=training_params['unlabeled']['batch_size'])
+    # Load drug features: unified drug encoder interface
+    drug_encoder_type = args.drug_encoder_type
+    unimol_emb_path = args.unimol_emb_path
+    unimol_dim = args.unimol_dim
+    drug_emb_dim = args.drug_emb_dim
+    drug_fusion_dropout = args.drug_fusion_dropout
+
+    # Always load RDKit fingerprints as base drug_feat (used by Drug_MLP in mlp/fusion modes)
     drug_feat = torch.from_numpy(get_drug_feat(drugs).astype('float32')).to(device)
+
+    # Pass unified drug encoder params to training pipeline
+    training_params['drug_encoder_type'] = drug_encoder_type
+    training_params['unimol_emb_path'] = unimol_emb_path
+    training_params['unimol_dim'] = unimol_dim
+    training_params['drug_emb_dim'] = drug_emb_dim
+    training_params['drug_fusion_dropout'] = drug_fusion_dropout
+
+    # Validate Uni-Mol path when needed
+    if drug_encoder_type in ('unimol', 'fp_unimol_fusion'):
+        if unimol_emb_path is None:
+            raise ValueError(
+                f"--drug_encoder_type={drug_encoder_type} requires --unimol_emb_path"
+            )
+        if not os.path.exists(unimol_emb_path):
+            raise ValueError(
+                f"Uni-Mol embedding file not found: {unimol_emb_path}\n"
+                f"Please run: python extract_unimol_embeddings.py to generate it."
+            )
+        print_logs(log_dir, f"Drug encoder: {drug_encoder_type}, unimol_path={unimol_emb_path}, dim={unimol_dim}")
+    else:
+        print_logs(log_dir, f"Drug encoder: {drug_encoder_type} (original Drug_MLP)")
+
     print_logs(log_dir, "s_dataloaders, t_dataloaders has been created")
 
     pretrain_model = ProgramTissueClassifier(
@@ -603,6 +635,18 @@ def main(args, update_params_dict, now_time):
         use_domain_sep=args.use_domain_sep,
         domain_sep_hidden_dim=args.domain_sep_hidden_dim,
         domain_sep_output_dim=args.domain_sep_output_dim,
+        # Hallmark gene-set encoder
+        program_encoder_type=args.program_encoder_type,
+        gene_set_mask_path=args.gene_set_mask_path,
+        gene_set_names_path=args.gene_set_names_path,
+        gene_set_token_dropout=args.gene_set_token_dropout,
+        use_pathway_embedding=args.use_pathway_embedding,
+        use_soft_gene_set_mask=args.use_soft_gene_set_mask,
+        soft_mask_scale=args.soft_mask_scale,
+        latent_num_programs=args.latent_num_programs,
+        gene_set_num_final_programs=args.gene_set_num_final_programs,
+        selector_num_heads=args.selector_num_heads,
+        selector_dropout=args.selector_dropout,
     ).to(device)
 
     # pre-training
@@ -1067,6 +1111,45 @@ if __name__ == '__main__':
     parser.add_argument('--convnext_depth', type=int, default=1, help='Number of ConvNeXt1D blocks')
     parser.add_argument('--convnext_kernel_size', type=int, default=7, help='Kernel size for ConvNeXt1D depthwise conv')
     parser.add_argument('--convnext_expansion', type=int, default=4, help='Expansion factor for ConvNeXt1D MLP')
+
+    # Unified Drug Encoder parameters (Uni-Mol / MLP / Fusion)
+    parser.add_argument('--drug_encoder_type', type=str, default='mlp',
+                        choices=['mlp', 'unimol', 'fp_unimol_fusion'],
+                        help='Drug encoder type: mlp (original), unimol (Uni-Mol only), fp_unimol_fusion (MLP+Uni-Mol)')
+    parser.add_argument('--unimol_emb_path', type=str, default=None,
+                        help='Path to offline Uni-Mol embedding .npy file (required for unimol/fp_unimol_fusion)')
+    parser.add_argument('--unimol_dim', type=int, default=512,
+                        help='Dimension of Uni-Mol embedding (e.g., 512 or 768)')
+    parser.add_argument('--drug_emb_dim', type=int, default=64,
+                        help='Output drug embedding dimension (must match model dim, default 64)')
+    parser.add_argument('--drug_fusion_dropout', type=float, default=0.1,
+                        help='Dropout for Uni-Mol projection and fusion MLPs')
+
+    # Hallmark Gene-Set Program Encoder parameters
+    parser.add_argument('--program_encoder_type', type=str, default='latent',
+                        choices=['latent', 'gene_set_mask', 'hybrid_gene_set_latent', 'gene_set_selector'],
+                        help='Program encoder type: latent (original), gene_set_mask (Hallmark), hybrid_gene_set_latent (Hallmark+latent), gene_set_selector (Hallmark->K via attention)')
+    parser.add_argument('--gene_set_mask_path', type=str, default=None,
+                        help='Path to gene_set_mask.pt or .npy (required for gene_set_mask/hybrid/gene_set_selector)')
+    parser.add_argument('--gene_set_names_path', type=str, default=None,
+                        help='Path to gene_set_names.txt for interpretability')
+    parser.add_argument('--gene_set_token_dropout', type=float, default=0.1,
+                        help='Dropout for gene-set token MLP')
+    parser.add_argument('--use_pathway_embedding', action='store_true', default=True,
+                        help='Enable learnable pathway bias in gene-set encoder')
+    parser.add_argument('--no_pathway_embedding', dest='use_pathway_embedding', action='store_false')
+    parser.add_argument('--use_soft_gene_set_mask', action='store_true', default=False,
+                        help='Enable soft mask fine-tuning for gene sets')
+    parser.add_argument('--soft_mask_scale', type=float, default=0.05,
+                        help='Scale for soft mask contribution')
+    parser.add_argument('--latent_num_programs', type=int, default=3,
+                        help='Number of latent tokens in hybrid mode')
+    parser.add_argument('--gene_set_num_final_programs', type=int, default=3,
+                        help='Number of final program tokens for gene_set_selector (K)')
+    parser.add_argument('--selector_num_heads', type=int, default=4,
+                        help='Number of attention heads for gene-set selector')
+    parser.add_argument('--selector_dropout', type=float, default=0.1,
+                        help='Dropout for gene-set selector attention')
 
     train_group = parser.add_mutually_exclusive_group(required=False)
     train_group.add_argument('--train', dest='retrain_flag', action='store_true')

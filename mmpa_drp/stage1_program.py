@@ -105,7 +105,7 @@ def train_tissue_classifier_program(
             ortho_loss_val = 0.0
             recon_loss_val = 0.0
             priv_domain_loss_val = 0.0
-            if getattr(model, 'use_domain_sep', False):
+            if getattr(model, 'use_domain_sep', False) and getattr(model.program_encoder, 'use_domain_sep', False):
                 # Get source domain sep outputs directly (avoid last_domain_sep_out overwrite)
                 source_enc_out = model.program_encoder(source_inputs, domain_idx=source_domain_idx)
                 source_h_shared = source_enc_out["h_shared"]
