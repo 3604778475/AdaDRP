@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import pandas as pd
 import json
 import argparse
@@ -13,6 +14,7 @@ from testing import testing
 from mmpa_drp.stage2_program import fusion_training_program
 from mmpa_drp.stage1_program import train_tissue_classifier_program, save_feat_program
 from mmpa_drp.models import ProgramTissueClassifier
+from mmpa_drp.drug_relation_refiner import build_drug_relation_graph
 
 
 def print_result(df, drugs, metrics, log_dir, brief_log_dir):
@@ -83,6 +85,44 @@ def print_result(df, drugs, metrics, log_dir, brief_log_dir):
     write_to_logs(brief_log_dir,formatted_result)
 
 
+def save_stage2_features_for_visualization(model, dataloader, drug_feat, device, save_path):
+    """
+    保存 Stage2/3 特征用于后续 T-SNE 可视化。
+    保存内容：gene_feat, fused_feature, labels, preds
+    """
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    all_gene_feat = []
+    all_fused = []
+    all_labels = []
+    all_preds = []
+
+    model.eval()
+    with torch.no_grad():
+        for batch in dataloader:
+            x = batch[0].to(device)
+            y = batch[1].to(device)
+            tissue = batch[3].to(device)
+            outputs = model(
+                x, drug_feat=drug_feat, tissue_idx=tissue,
+                return_dict=True, return_fused_feature=True
+            )
+            batch_size = outputs["gene_feat"].size(0)
+            drug_num = outputs["fused_feature"].size(1)
+            all_gene_feat.append(outputs["gene_feat"].cpu().numpy())
+            all_fused.append(outputs["fused_feature"].cpu().numpy())
+            all_labels.append(y.cpu().numpy())
+            all_preds.append(outputs["pred"].view(batch_size, drug_num).cpu().numpy())
+
+    np.savez(
+        save_path,
+        gene_feat=np.concatenate(all_gene_feat, axis=0),
+        fused_feature=np.concatenate(all_fused, axis=0),
+        labels=np.concatenate(all_labels, axis=0),
+        preds=np.concatenate(all_preds, axis=0),
+    )
+    print(f"[Visualization] Saved Stage2/3 features to {save_path}")
+
+
 def main(args, update_params_dict, now_time):
     seed = 2025
     set_seed(seed)
@@ -93,6 +133,22 @@ def main(args, update_params_dict, now_time):
     # Phase 11-C: Cross-Attention Fusion params
     update_params_dict['use_cross_attn'] = args.use_cross_attn
     update_params_dict['cross_attn_num_heads'] = args.cross_attn_num_heads
+
+    # Drug relation refiner params
+    update_params_dict['use_drug_relation_refiner'] = args.use_drug_relation_refiner
+    update_params_dict['drug_relation_graph_type'] = args.drug_relation_graph_type
+    update_params_dict['drug_relation_k'] = args.drug_relation_k
+    update_params_dict['drug_relation_threshold'] = args.drug_relation_threshold
+    update_params_dict['drug_relation_num_layers'] = args.drug_relation_num_layers
+    update_params_dict['drug_relation_dropout'] = args.drug_relation_dropout
+    update_params_dict['drug_relation_residual'] = args.drug_relation_residual
+
+    # DBSCAN filtering params
+    update_params_dict['use_dbscan_filter'] = args.use_dbscan_filter
+    update_params_dict['dbscan_mode'] = args.dbscan_mode
+    update_params_dict['dbscan_eps'] = args.dbscan_eps
+    update_params_dict['dbscan_min_samples'] = args.dbscan_min_samples
+    update_params_dict['dbscan_distance'] = args.dbscan_distance
 
     training_params['unlabeled'].update(update_params_dict)
     training_params['labeled'].update(update_params_dict)
@@ -108,9 +164,17 @@ def main(args, update_params_dict, now_time):
         'lambda_private_domain': 'lpd',
         'lambda_migrate': 'lm',
     }
+    _excluded_from_param_str = {
+        'use_cross_attn', 'cross_attn_num_heads',
+        'use_drug_relation_refiner', 'drug_relation_graph_type',
+        'drug_relation_k', 'drug_relation_threshold',
+        'drug_relation_num_layers', 'drug_relation_dropout',
+        'drug_relation_residual',
+        'use_dbscan_filter', 'dbscan_mode', 'dbscan_eps', 'dbscan_min_samples', 'dbscan_distance',
+    }
     param_dict_for_str = {}
     for k, v in update_params_dict.items():
-        if k in ('use_cross_attn', 'cross_attn_num_heads'):
+        if k in _excluded_from_param_str:
             continue  # appended manually below with shorter suffix
         param_dict_for_str[_key_abbr.get(k, k)] = v
     param_str = dict_to_str(param_dict_for_str)
@@ -175,6 +239,22 @@ def main(args, update_params_dict, now_time):
         else:
             param_str += "_global"
         param_str += f"_m{args.fpi_m_max}_fp{args.fpi_fp_dim}"
+
+    # Append Drug Relation Refiner params to param_str
+    if args.use_drug_relation_refiner:
+        param_str += (
+            f"_drr_t{args.drug_relation_graph_type[0]}"
+            f"k{args.drug_relation_k}"
+            f"th{args.drug_relation_threshold}"
+            f"l{args.drug_relation_num_layers}"
+            f"d{args.drug_relation_dropout}"
+            f"r{int(args.drug_relation_residual)}"
+        )
+
+    # Append DBSCAN filter params to param_str
+    if args.use_dbscan_filter:
+        mode_prefix = 'dba' if args.dbscan_mode == 'adaptive' else 'dbf'
+        param_str += f"_{mode_prefix}_e{args.dbscan_eps}_m{args.dbscan_min_samples}_{args.dbscan_distance[0]}"
 
     # Append FPI Router params to param_str
     if args.use_fpi_router:
@@ -594,6 +674,30 @@ def main(args, update_params_dict, now_time):
     # Always load RDKit fingerprints as base drug_feat (used by Drug_MLP in mlp/fusion modes)
     drug_feat = torch.from_numpy(get_drug_feat(drugs).astype('float32')).to(device)
 
+    # Build drug relation graph if refiner is enabled
+    if args.use_drug_relation_refiner:
+        smiles_df = pd.read_csv('data/raw_dat/GDSC/drug_smiles.csv', header=0, index_col=0)
+        smiles_list = [smiles_df.loc[d, 'Isosmiles'] for d in drugs]
+        if args.drug_relation_graph_type == 'label_graph':
+            raise NotImplementedError(
+                "drug_relation_graph_type='label_graph' is not yet supported from train_mmpa_program.py. "
+                "Use 'chemical' or pass a precomputed graph via training_params."
+            )
+        drug_relation_graph = build_drug_relation_graph(
+            smiles_list=smiles_list,
+            graph_type=args.drug_relation_graph_type,
+            k=args.drug_relation_k,
+            threshold=args.drug_relation_threshold,
+        )
+        training_params['drug_relation_graph'] = drug_relation_graph
+        training_params['smiles_list'] = smiles_list
+        print(
+            f"[Drug Relation Graph] built {drug_relation_graph.shape} adjacency, "
+            f"nonzero={(drug_relation_graph > 0).sum()}, "
+            f"type={args.drug_relation_graph_type}, k={args.drug_relation_k}, "
+            f"threshold={args.drug_relation_threshold}"
+        )
+
     # Pass unified drug encoder params to training pipeline
     training_params['drug_encoder_type'] = drug_encoder_type
     training_params['unimol_emb_path'] = unimol_emb_path
@@ -720,6 +824,16 @@ def main(args, update_params_dict, now_time):
                 **wrap_params(training_params, type='labeled')
             )
             fusion_model.load_state_dict(torch.load(os.path.join(training_params['model_save_folder'], f'fusion_model_fold{fold}.pt')))
+
+            # Save Stage2/3 features for T-SNE visualization
+            vis_feat_path = os.path.join("outputs", "saved_features", f"stage2_fold{fold}_tcga.npz")
+            save_stage2_features_for_visualization(
+                model=fusion_model,
+                dataloader=labeled_tcga,
+                drug_feat=drug_feat,
+                device=training_params['device'],
+                save_path=vis_feat_path,
+            )
 
             test_loss, results, y_true, y_pred, y_mask = testing(model=fusion_model, t_dataloader=labeled_tcga, drug_feat=drug_feat, device=training_params['device'])
             print('test-avg (TCGA) metrics (auc,aupr,f1,acc): {}'.format(np.around(results.mean(axis=1), 4)))
@@ -1126,6 +1240,37 @@ if __name__ == '__main__':
                         help='Output drug embedding dimension (must match model dim, default 64)')
     parser.add_argument('--drug_fusion_dropout', type=float, default=0.1,
                         help='Dropout for Uni-Mol projection and fusion MLPs')
+
+    # Drug Relation Refiner parameters
+    parser.add_argument('--use_drug_relation_refiner', action='store_true',
+                        help='Enable drug relation graph refiner after drug encoder')
+    parser.add_argument('--drug_relation_graph_type', type=str, default='chemical',
+                        choices=['chemical', 'label_graph'],
+                        help='Type of drug relation graph')
+    parser.add_argument('--drug_relation_k', type=int, default=3,
+                        help='Top-K neighbors for chemical graph')
+    parser.add_argument('--drug_relation_threshold', type=float, default=0.3,
+                        help='Similarity threshold for chemical graph edges')
+    parser.add_argument('--drug_relation_num_layers', type=int, default=1,
+                        help='Number of drug relation refiner GNN layers')
+    parser.add_argument('--drug_relation_dropout', type=float, default=0.1,
+                        help='Dropout for drug relation refiner')
+    parser.add_argument('--drug_relation_residual', action='store_true', default=True,
+                        help='Use residual connection in drug relation refiner')
+
+    # DBSCAN-based contrastive positive filtering
+    parser.add_argument('--use_dbscan_filter', action='store_true',
+                        help='Enable DBSCAN filtering of Top-K contrastive positives')
+    parser.add_argument('--dbscan_mode', type=str, default='adaptive',
+                        choices=['filter', 'adaptive'],
+                        help='DBSCAN mode: filter Top-K (filter) or adaptive neighbor selection (adaptive)')
+    parser.add_argument('--dbscan_eps', type=float, default=0.3,
+                        help='DBSCAN eps for positive filtering')
+    parser.add_argument('--dbscan_min_samples', type=int, default=5,
+                        help='DBSCAN min_samples for positive filtering')
+    parser.add_argument('--dbscan_distance', type=str, default='cosine',
+                        choices=['cosine', 'euclidean'],
+                        help='Distance metric for DBSCAN filtering')
 
     # Hallmark Gene-Set Program Encoder parameters
     parser.add_argument('--program_encoder_type', type=str, default='latent',

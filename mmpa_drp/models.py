@@ -27,6 +27,10 @@ from mmpa_drp.fragment_encoder import DrugFragmentEncoder
 from mmpa_drp.fpi import FragmentProgramInteraction
 from mmpa_drp.graph_drug_encoder import GraphTransformerDrugEncoder
 from mmpa_drp.pretrained_drug_encoder import build_pretrained_drug_encoder
+from mmpa_drp.drug_relation_refiner import (
+    DrugRelationRefiner,
+    build_drug_relation_graph,
+)
 from mmpa_drp.pathway_encoder import (
     GeneSetMaskProgramEncoder,
     HybridGeneSetLatentProgramEncoder,
@@ -1873,6 +1877,12 @@ class ProgramFusionMLP(nn.Module):
         unimol_emb_path=None,
         drug_emb_dim=64,
         drug_fusion_dropout=0.1,
+        # Drug relation refiner
+        use_drug_relation_refiner=False,
+        drug_relation_graph=None,
+        drug_relation_num_layers=1,
+        drug_relation_dropout=0.1,
+        drug_relation_residual=True,
         **kwargs,
     ):
         super(ProgramFusionMLP, self).__init__()
@@ -2053,6 +2063,31 @@ class ProgramFusionMLP(nn.Module):
                     drug_emb_dim=drug_emb_dim,
                     dropout=drug_fusion_dropout,
                 )
+
+        # Drug relation refiner: graph propagation over drug embeddings
+        self.use_drug_relation_refiner = use_drug_relation_refiner
+        self.drug_relation_refiner = None
+        if self.use_drug_relation_refiner:
+            if drug_relation_graph is None:
+                raise ValueError(
+                    "use_drug_relation_refiner=True requires drug_relation_graph"
+                )
+            adj = np.asarray(drug_relation_graph, dtype=np.float32)
+            if adj.shape != (drug_num, drug_num):
+                raise ValueError(
+                    f"drug_relation_graph shape {adj.shape} does not match drug_num {drug_num}"
+                )
+            self.register_buffer("drug_adj", torch.from_numpy(adj))
+            self.drug_relation_refiner = DrugRelationRefiner(
+                emb_dim=drug_emb_dim,
+                num_layers=drug_relation_num_layers,
+                dropout=drug_relation_dropout,
+                residual=drug_relation_residual,
+            )
+            print(
+                f"[Drug Relation Refiner] enabled: layers={drug_relation_num_layers}, "
+                f"dropout={drug_relation_dropout}, residual={drug_relation_residual}"
+            )
 
         print(
             f"[Drug Encoder] type={self.drug_encoder_type}, "
@@ -2373,6 +2408,9 @@ class ProgramFusionMLP(nn.Module):
             drug_emb = self.drug_fusion(r_fp, r_uni)
         else:
             raise ValueError(f"Unknown drug_encoder_type: {self.drug_encoder_type}")
+
+        if self.use_drug_relation_refiner and self.drug_relation_refiner is not None:
+            drug_emb = self.drug_relation_refiner(drug_emb, self.drug_adj)
 
         drug_emb = F.normalize(drug_emb, p=2, dim=1)
 

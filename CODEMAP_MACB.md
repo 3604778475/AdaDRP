@@ -2473,6 +2473,19 @@ auc_aupr_metrics：0.6875/0.1414
 
  python train_mmpa_program.py --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5 --train --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7 --num_programs 8 --program_dim 64 --K 3 --use_ot_alignment --lambda_ot 0.005 --ot_reg 0.1 --ot_cost_type cosine --ot_marginal_type uniform --use_cdan --use_domain_sep --domain_sep_hidden_dim 256 --domain_sep_output_dim 64 --lambda_ortho 0.001 --lambda_recon 0.005 --lambda_private_domain 0.005 --lambda_migrate 0.01 --alph 1.4 --beta 0.066 --use_fpi --fpi_gamma_max 0.1 --fpi_gamma_init 0.05 --fpi_q_prior_weight 0.01 --fpi_dropout 0.1 --fpi_m_max 16 --fpi_fp_dim 1024 --lambda_fpi_gamma_l1 0.001 --fpi_detach_mode none --pretrain_num_epochs 100 --train_num_epochs 100 --contrastive_num_epochs 100
 
+python train_mmpa_program.py \
+  --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5 \
+  --train --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7 \
+  --num_programs 8 --program_dim 64 --K 9 \
+  --use_ot_alignment --lambda_ot 0.005 --ot_reg 0.1 --ot_cost_type cosine --ot_marginal_type uniform \
+  --use_cdan \
+  --use_domain_sep --domain_sep_hidden_dim 256 --domain_sep_output_dim 64 \
+  --lambda_ortho 0.001 --lambda_recon 0.005 --lambda_private_domain 0.005 --lambda_migrate 0.01 \
+  --alph 1.4 --beta 0.066 \
+  --use_fpi --fpi_gamma_max 0.1 --fpi_gamma_init 0.05 --fpi_q_prior_weight 0.01 --fpi_dropout 0.1 \
+  --fpi_m_max 16 --fpi_fp_dim 1024 --lambda_fpi_gamma_l1 0.001 --fpi_detach_mode none \
+  --pretrain_num_epochs 100 --train_num_epochs 100 --contrastive_num_epochs 100
+
 5-fold average/std results: 
 5-Fluorouracil    auc: 0.6500/0.0589 | aupr: 0.7449/0.0489 | f1: 0.6509/0.0403 | acc: 0.7458/0.0322
 Cisplatin         auc: 0.6423/0.0373 | aupr: 0.8261/0.0257 | f1: 0.6739/0.0295 | acc: 0.7802/0.0311
@@ -2488,6 +2501,50 @@ auc&aupr average/std results: 5-Fluorouracil: 0.6974/0.0715 | Cisplatin: 0.7342/
 auc：0.6351/0.0755  aupr：0.7599/0.1532  acc：0.7042/0.2315  f1：0.6885/0.1024
 all_metrics：0.6969/0.1574
 auc_aupr_metrics：0.6975/0.1347
+
+k=4
+5-fold average/std results: 
+5-Fluorouracil    auc: 0.6344/0.0688 | aupr: 0.7322/0.0553 | f1: 0.6382/0.0554 | acc: 0.7338/0.0432
+Cisplatin         auc: 0.6483/0.0342 | aupr: 0.8273/0.0211 | f1: 0.6777/0.0186 | acc: 0.7815/0.0212
+Cyclophosphamide  auc: 0.7020/0.0586 | aupr: 0.9557/0.0175 | f1: 0.8071/0.0705 | acc: 0.8869/0.0478
+Docetaxel         auc: 0.5746/0.0773 | aupr: 0.7492/0.0426 | f1: 0.6075/0.0753 | acc: 0.7274/0.0650
+Doxorubicin       auc: 0.5989/0.0659 | aupr: 0.8399/0.0282 | f1: 0.6126/0.0687 | acc: 0.7293/0.0738
+Etoposide         auc: 0.7642/0.0680 | aupr: 0.9309/0.0293 | f1: 0.8187/0.0394 | acc: 0.8912/0.0270
+Gemcitabine       auc: 0.5836/0.0217 | aupr: 0.5891/0.0310 | f1: 0.5435/0.0351 | acc: 0.5978/0.0225
+Paclitaxel        auc: 0.5853/0.0281 | aupr: 0.7621/0.0106 | f1: 0.6486/0.0346 | acc: 0.7649/0.0371
+Temozolomide      auc: 0.6539/0.0500 | aupr: 0.4687/0.0569 | f1: 0.7552/0.0123 | acc: 0.0761/0.0791
+4 metrics average/std results: 5-Fluorouracil: 0.6846/0.0717 | Cisplatin: 0.7337/0.0785 | Cyclophosphamide: 0.8379/0.1082 | Docetaxel: 0.6647/0.0982 | Doxorubicin: 0.6952/0.1152 | Etoposide: 0.8513/0.0774 | Gemcitabine: 0.5785/0.0335 | Paclitaxel: 0.6902/0.0831 | Temozolomide: 0.4885/0.2708
+auc&aupr average/std results: 5-Fluorouracil: 0.6833/0.0783 | Cisplatin: 0.7378/0.0981 | Cyclophosphamide: 0.8288/0.1398 | Docetaxel: 0.6619/0.1092 | Doxorubicin: 0.7194/0.1357 | Etoposide: 0.8476/0.1008 | Gemcitabine: 0.5864/0.0254 | Paclitaxel: 0.6737/0.0953 | Temozolomide: 0.5613/0.1099
+auc：0.6384/0.0784  aupr：0.7617/0.1517  acc：0.6877/0.2388  f1：0.6788/0.1014
+all_metrics：0.6916/0.1599
+auc_aupr_metrics：0.7000/0.1344
+
+K=9
+5-fold average/std results: 
+5-Fluorouracil    auc: 0.6366/0.0622 | aupr: 0.7373/0.0502 | f1: 0.6464/0.0411 | acc: 0.7438/0.0343
+Cisplatin         auc: 0.6432/0.0380 | aupr: 0.8276/0.0259 | f1: 0.6806/0.0167 | acc: 0.7872/0.0166
+Cyclophosphamide  auc: 0.7102/0.0646 | aupr: 0.9591/0.0153 | f1: 0.8188/0.0571 | acc: 0.8952/0.0371
+Docetaxel         auc: 0.5945/0.0708 | aupr: 0.7563/0.0457 | f1: 0.6164/0.0440 | acc: 0.7354/0.0402
+Doxorubicin       auc: 0.6219/0.0670 | aupr: 0.8507/0.0270 | f1: 0.6516/0.0332 | acc: 0.7648/0.0305
+Etoposide         auc: 0.7670/0.0837 | aupr: 0.9311/0.0342 | f1: 0.8313/0.0528 | acc: 0.8988/0.0384
+Gemcitabine       auc: 0.5714/0.0191 | aupr: 0.5737/0.0263 | f1: 0.5374/0.0271 | acc: 0.5894/0.0310
+Paclitaxel        auc: 0.6000/0.0305 | aupr: 0.7715/0.0167 | f1: 0.6622/0.0110 | acc: 0.7795/0.0064
+Temozolomide      auc: 0.6748/0.0374 | aupr: 0.5191/0.0437 | f1: 0.7582/0.0187 | acc: 0.1173/0.1691
+4 metrics average/std results: 5-Fluorouracil: 0.6910/0.0674 | Cisplatin: 0.7347/0.0808 | Cyclophosphamide: 0.8458/0.1047 | Docetaxel: 0.6756/0.0869 | Doxorubicin: 0.7222/0.1015 | Etoposide: 0.8570/0.0826 | Gemcitabine: 0.5680/0.0309 | Paclitaxel: 0.7033/0.0793 | Temozolomide: 0.5174/0.2659
+auc&aupr average/std results: 5-Fluorouracil: 0.6869/0.0752 | Cisplatin: 0.7354/0.1019 | Cyclophosphamide: 0.8346/0.1384 | Docetaxel: 0.6754/0.1021 | Doxorubicin: 0.7363/0.1298 | Etoposide: 0.8491/0.1054 | Gemcitabine: 0.5726/0.0217 | Paclitaxel: 0.6857/0.0933 | Temozolomide: 0.5970/0.0906
+auc：0.6466/0.0780  aupr：0.7696/0.1440  acc：0.7013/0.2335  f1：0.6892/0.0977
+all_metrics：0.7017/0.1555
+auc_aupr_metrics：0.7081/0.1300
+
+四、怎么知道 latent program 学到了什么
+如果想验证 latent program 是否对应通路，可以做事后分析：
+
+看每个 program 对哪些基因权重高；
+把这些基因做通路富集分析（GSEA / ORA）；
+看是否显著富集到某个 Hallmark / KEGG 通路。
+如果显著富集，说明模型学到了和通路相关的结构；
+如果没有，说明它学到的是任务特有的、非通路化的特征组合。
+
 *****************************************************
 
 ## 18.在stage1阶段在现有模型基础上利用对比和对抗学习分析出shared domain和private domain（无药物参与），借鉴DCD的分离方法，在stage2仅使用shareddomain与药物进行交互，借鉴BML，将shared domain对drug的学习迁移到private domain中对齐

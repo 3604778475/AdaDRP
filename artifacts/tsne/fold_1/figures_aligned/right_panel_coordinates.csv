@@ -1,0 +1,217 @@
+x,y,domain,tissue,tissue_name
+-5.9284635,10.188537,source,1,Bladder
+-8.031855,-8.0077095,source,5,Colon
+5.9610186,7.3085127,source,11,Head and Neck
+5.4950557,-3.1260638,source,11,Head and Neck
+-4.450598,-3.5555878,source,5,Colon
+-5.43364,-6.1904106,source,5,Colon
+1.6350057,-6.26976,source,31,Uterine
+-3.6592937,-7.397598,source,5,Colon
+-4.479517,-7.7031345,source,5,Colon
+-2.1782274,-7.3891325,source,5,Colon
+2.2961345,-6.993625,source,31,Uterine
+1.9031715,11.657159,source,11,Head and Neck
+1.0336049,6.322019,source,12,Kidney
+0.35093796,6.7805905,source,1,Bladder
+-1.5105896,-5.6603913,source,5,Colon
+4.5726986,-6.1093884,source,5,Colon
+-1.52307,-8.162748,source,5,Colon
+-4.6419444,-6.3876257,source,5,Colon
+5.55517,-3.8306382,source,5,Colon
+-0.47272703,-7.539322,source,5,Colon
+1.0742602,10.333325,source,1,Bladder
+4.1727304,7.828163,source,11,Head and Neck
+2.1914935,10.239193,source,11,Head and Neck
+-3.8658862,-7.8402185,source,5,Colon
+-4.740617,-5.1422415,source,31,Uterine
+-7.5409546,-9.63547,source,5,Colon
+-4.456284,8.06835,source,5,Colon
+2.0582693,6.9673514,source,31,Uterine
+3.2287376,-5.2172394,source,31,Uterine
+-6.14098,-7.603592,source,5,Colon
+2.4180515,-11.375477,source,31,Uterine
+-8.400734,-8.44387,source,5,Colon
+-8.54918,-7.5380416,source,5,Colon
+-7.223234,-7.761752,source,5,Colon
+-7.2202406,-0.70320296,source,21,Ovarian
+-3.769147,9.2648115,source,31,Uterine
+-5.341167,-0.7661971,source,14,Liver
+-9.377882,-4.0094523,source,5,Colon
+4.9920006,-4.3317504,source,5,Colon
+7.584057,3.9722347,source,11,Head and Neck
+2.471886,9.978174,source,11,Head and Neck
+-2.9635298,-9.468218,source,5,Colon
+-2.659244,-7.35853,source,5,Colon
+-3.1769295,-8.118141,source,5,Colon
+6.280542,7.9562616,source,31,Uterine
+-6.051257,-1.1666485,source,31,Uterine
+-4.6554346,-1.7806542,source,1,Bladder
+-9.12079,-7.8680887,source,21,Ovarian
+-7.386777,-9.280677,source,11,Head and Neck
+-5.616088,-3.0601547,source,14,Liver
+-2.5352182,-4.775273,source,31,Uterine
+7.273499,7.4719977,source,11,Head and Neck
+-4.520203,-8.160725,source,5,Colon
+1.1414639,11.369253,source,11,Head and Neck
+-4.90603,-7.3618836,source,5,Colon
+-8.776037,-7.1005344,source,1,Bladder
+-4.6607823,-9.747046,source,1,Bladder
+0.6641775,11.162323,source,11,Head and Neck
+5.2517467,-2.1217813,source,12,Kidney
+-2.3053062,-5.4436803,source,23,Prostate
+-6.321143,-0.56332743,source,1,Bladder
+-2.9275708,-10.092341,source,5,Colon
+1.8048927,7.418744,source,1,Bladder
+-7.570323,-3.6361141,source,5,Colon
+-7.6066146,-2.4711926,source,5,Colon
+0.8765549,6.050872,source,31,Uterine
+-5.712193,0.068827026,source,14,Liver
+6.67802,6.2658944,source,11,Head and Neck
+4.761493,7.7914004,source,31,Uterine
+3.6129436,7.034042,source,1,Bladder
+2.739335,-6.1307755,source,5,Colon
+5.569307,-0.81749314,source,5,Colon
+-2.8869748,-6.0220013,source,21,Ovarian
+-8.05866,-9.612691,source,12,Kidney
+2.868244,6.988798,source,31,Uterine
+-6.7829943,-0.22149506,source,21,Ovarian
+-1.6875844,10.727869,source,31,Uterine
+-8.276816,-0.78905797,source,21,Ovarian
+2.314668,-11.441548,source,31,Uterine
+2.059981,-6.4038415,source,5,Colon
+3.1445684,7.5138264,source,11,Head and Neck
+-6.4552817,-1.1982063,source,14,Liver
+6.1406364,5.967318,source,11,Head and Neck
+1.6284394,6.1633997,source,12,Kidney
+-6.943612,3.093046,source,14,Liver
+-7.636899,-0.17584492,source,1,Bladder
+-0.8039504,-8.86661,source,5,Colon
+0.5140326,-6.355135,source,31,Uterine
+4.070125,6.334617,source,11,Head and Neck
+-5.028745,-8.731946,source,31,Uterine
+1.6744157,10.506219,source,11,Head and Neck
+-8.155695,-9.103584,source,5,Colon
+-7.23767,-1.8259338,source,14,Liver
+-6.780815,7.1912775,source,1,Bladder
+-7.033451,-8.478862,source,5,Colon
+-3.045689,-10.0573225,source,5,Colon
+-2.091355,-9.117605,source,5,Colon
+-3.8313217,-5.3964186,source,5,Colon
+6.0732617,8.075527,source,11,Head and Neck
+-8.930817,-8.401597,source,21,Ovarian
+5.035661,-2.7943115,source,31,Uterine
+6.2006574,7.1743426,source,11,Head and Neck
+4.9840374,8.112504,source,23,Prostate
+3.0515022,-6.1641965,source,23,Prostate
+-7.9813414,-1.4768046,source,21,Ovarian
+2.142353,-11.080707,source,31,Uterine
+-6.6264668,0.63160014,source,14,Liver
+-0.8372477,-4.3767123,source,1,Bladder
+3.7888227,-6.5429993,target,21,Ovarian
+-7.898029,-0.6688835,target,21,Ovarian
+4.484587,-9.61757,target,21,Ovarian
+4.3707085,-5.433459,target,31,Uterine
+-0.5992966,-5.208077,target,21,Ovarian
+-3.7194822,10.131396,target,12,Kidney
+-4.253129,-2.5395112,target,31,Uterine
+-7.7590327,5.321103,target,31,Uterine
+-2.8876712,11.165687,target,5,Colon
+-2.844444,12.137394,target,5,Colon
+-3.2407072,11.707853,target,5,Colon
+-7.5771756,4.743546,target,5,Colon
+-3.9550521,11.795418,target,5,Colon
+1.0369081,-8.680506,target,5,Colon
+-6.41472,7.9711795,target,5,Colon
+-7.377465,7.9374423,target,5,Colon
+-2.7086093,12.725906,target,5,Colon
+-4.3417673,11.599801,target,5,Colon
+-0.82451326,-9.2442045,target,5,Colon
+-6.8733788,-3.5185285,target,5,Colon
+-3.9636028,8.358854,target,5,Colon
+-2.364349,9.899687,target,31,Uterine
+6.0539308,-1.4586005,target,31,Uterine
+-7.1827497,5.6100416,target,5,Colon
+1.1369616,-9.831402,target,5,Colon
+-4.9955263,11.548221,target,5,Colon
+-2.2093246,-9.604127,target,5,Colon
+3.8195937,7.9677005,target,11,Head and Neck
+6.054228,8.937438,target,11,Head and Neck
+7.4427853,1.4563462,target,11,Head and Neck
+3.8728604,10.775501,target,11,Head and Neck
+-7.5879593,10.599123,target,1,Bladder
+4.8878245,-2.4457223,target,1,Bladder
+-3.8423002,11.222052,target,5,Colon
+-9.755292,-3.3722963,target,5,Colon
+5.740607,-2.6840773,target,5,Colon
+-4.427879,10.182879,target,5,Colon
+-7.1346326,4.505326,target,5,Colon
+-6.650089,8.499691,target,5,Colon
+-3.5760515,12.26997,target,5,Colon
+-5.8721905,8.58682,target,5,Colon
+2.534133,10.637828,target,11,Head and Neck
+2.9331293,9.022093,target,11,Head and Neck
+5.206732,6.271178,target,11,Head and Neck
+4.3291683,7.003408,target,11,Head and Neck
+6.838386,2.7112827,target,11,Head and Neck
+1.831018,11.158993,target,11,Head and Neck
+4.0212665,-8.100691,target,14,Liver
+4.4154043,-8.9569025,target,14,Liver
+4.443936,-4.713141,target,14,Liver
+-7.515898,3.7212012,target,14,Liver
+-0.06998478,12.165503,target,1,Bladder
+-2.705727,10.337688,target,31,Uterine
+1.8989491,8.0803585,target,31,Uterine
+-8.081192,-2.5598583,target,31,Uterine
+-3.4718997,12.865273,target,5,Colon
+-4.0604973,10.663863,target,5,Colon
+-3.641795,10.671643,target,5,Colon
+-6.759199,11.005322,target,5,Colon
+-3.3482733,-3.7243395,target,5,Colon
+-6.768979,9.247213,target,5,Colon
+0.68836176,12.0076275,target,1,Bladder
+-5.9096503,7.994092,target,14,Liver
+4.8829937,-3.5170116,target,1,Bladder
+7.070485,2.127369,target,1,Bladder
+7.535087,4.5395083,target,1,Bladder
+3.2402368,-9.1969185,target,23,Prostate
+4.830099,-7.9758472,target,1,Bladder
+3.0568829,10.79804,target,11,Head and Neck
+-1.7112997,7.278684,target,12,Kidney
+5.3728566,8.958554,target,11,Head and Neck
+6.6705513,1.4553734,target,11,Head and Neck
+-1.8318149,11.172844,target,31,Uterine
+6.7185335,4.7724285,target,31,Uterine
+2.3794124,-8.301233,target,31,Uterine
+3.0970132,-6.678406,target,23,Prostate
+7.264162,8.1888075,target,31,Uterine
+6.129939,-5.2848053,target,11,Head and Neck
+6.354483,-2.7119675,target,11,Head and Neck
+-2.1750164,-4.5163083,target,31,Uterine
+0.14170115,5.8395767,target,31,Uterine
+-6.160947,6.541569,target,5,Colon
+-6.1088057,9.416851,target,5,Colon
+-7.1231346,6.6571946,target,5,Colon
+-4.351051,7.1846285,target,5,Colon
+3.1365047,-8.532974,target,5,Colon
+-7.415262,8.7620325,target,5,Colon
+-3.4792554,-6.1338086,target,21,Ovarian
+3.3950613,-7.541755,target,21,Ovarian
+6.8228173,0.29931727,target,11,Head and Neck
+2.3189542,-5.328504,target,12,Kidney
+2.69859,-6.864251,target,5,Colon
+6.7219305,-3.3354015,target,11,Head and Neck
+8.109045,5.610619,target,11,Head and Neck
+-7.077643,3.7938714,target,14,Liver
+3.7050884,-8.3350115,target,14,Liver
+6.510637,3.4617534,target,31,Uterine
+3.0866725,-7.6347775,target,23,Prostate
+2.962044,11.543715,target,31,Uterine
+7.9285827,7.3103285,target,31,Uterine
+-7.4423337,7.140838,target,31,Uterine
+0.3029946,7.247055,target,31,Uterine
+2.8987725,-4.5327187,target,12,Kidney
+4.772345,-5.2570577,target,21,Ovarian
+0.55928695,13.386918,target,1,Bladder
+4.8219137,-8.346026,target,1,Bladder
+2.2980921,12.115642,target,1,Bladder
+-0.8050261,9.110283,target,1,Bladder

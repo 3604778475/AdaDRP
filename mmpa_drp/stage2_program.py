@@ -23,6 +23,7 @@ from finetune import (
     get_featuers,
     get_gene_feat_sim,
 )
+from mmpa_drp.dbscan_filter import dbscan_filter_topk, dbscan_adaptive_neighbors
 
 
 from mmpa_drp.losses import (
@@ -488,6 +489,7 @@ def _fusion_model_train_step_with_contrastive_and_gate(
     s_tissue = batch[0][3].to(device)
     s_topk_idx = batch[0][5].to(device)
     s_topk_sim = batch[0][4].to(device) if batch[0][4] is not None else None
+    s_anchor_valid = batch[0][6].to(device) if len(batch[0]) > 6 else None
 
     s_outputs = model(s_x, drug_feat, s_tissue, alpha=alpha)
     s_yp = s_outputs[0]
@@ -524,6 +526,14 @@ def _fusion_model_train_step_with_contrastive_and_gate(
             # Low confidence -> high weight: weight = alpha - (alpha-1) * confidence
             weights = diff_contrastive_alpha - (diff_contrastive_alpha - 1.0) * confidence
             anchor_weights = weights.reshape(-1)  # [B*drug_num]
+
+    # DBSCAN adaptive: skip outlier anchors
+    if s_anchor_valid is not None:
+        valid_flat = s_anchor_valid.reshape(-1)
+        if anchor_weights is not None:
+            anchor_weights = anchor_weights * valid_flat
+        else:
+            anchor_weights = valid_flat
 
     # Contrastive loss (with optional InfoNCE / hard negatives / pos weighting)
     B = s_y.size(0)
@@ -680,6 +690,7 @@ def _fusion_model_train_step_with_contrastive(
     s_tissue = batch[0][3].to(device)
     s_topk_idx = batch[0][5].to(device)
     s_topk_sim = batch[0][4].to(device) if batch[0][4] is not None else None
+    s_anchor_valid = batch[0][6].to(device) if len(batch[0]) > 6 else None
 
     s_outputs = model(s_x, drug_feat, s_tissue)
     s_yp = s_outputs[0]
@@ -712,6 +723,14 @@ def _fusion_model_train_step_with_contrastive(
             confidence = torch.where(s_mask, confidence, torch.ones_like(confidence))
             weights = diff_contrastive_alpha - (diff_contrastive_alpha - 1.0) * confidence
             anchor_weights = weights.reshape(-1)  # [B*drug_num]
+
+    # DBSCAN adaptive: skip outlier anchors
+    if s_anchor_valid is not None:
+        valid_flat = s_anchor_valid.reshape(-1)
+        if anchor_weights is not None:
+            anchor_weights = anchor_weights * valid_flat
+        else:
+            anchor_weights = valid_flat
 
     # Contrastive loss
     B = s_y.size(0)
@@ -1411,6 +1430,20 @@ def fusion_training_program(
     drug_emb_dim = kwargs.get('drug_emb_dim', 64)
     drug_fusion_dropout = kwargs.get('drug_fusion_dropout', 0.1)
 
+    # Drug relation refiner parameters
+    use_drug_relation_refiner = kwargs.get('use_drug_relation_refiner', False)
+    drug_relation_graph = kwargs.get('drug_relation_graph', None)
+    drug_relation_num_layers = kwargs.get('drug_relation_num_layers', 1)
+    drug_relation_dropout = kwargs.get('drug_relation_dropout', 0.1)
+    drug_relation_residual = kwargs.get('drug_relation_residual', True)
+
+    # DBSCAN-based contrastive positive filtering
+    use_dbscan_filter = kwargs.get('use_dbscan_filter', False)
+    dbscan_mode = kwargs.get('dbscan_mode', 'adaptive')
+    dbscan_eps = kwargs.get('dbscan_eps', 0.3)
+    dbscan_min_samples = kwargs.get('dbscan_min_samples', 5)
+    dbscan_distance = kwargs.get('dbscan_distance', 'cosine')
+
     # Phase 9: FPI parameters
     use_fpi = kwargs.get('use_fpi', False)
     fpi_config = kwargs.get('fpi_config', None)
@@ -1771,6 +1804,12 @@ def fusion_training_program(
         unimol_dim=unimol_dim,
         drug_emb_dim=drug_emb_dim,
         drug_fusion_dropout=drug_fusion_dropout,
+        # Drug relation refiner
+        use_drug_relation_refiner=use_drug_relation_refiner,
+        drug_relation_graph=drug_relation_graph,
+        drug_relation_num_layers=drug_relation_num_layers,
+        drug_relation_dropout=drug_relation_dropout,
+        drug_relation_residual=drug_relation_residual,
     ).to(kwargs["device"])
 
     # Phase 9-R Diagnosis: two-stage cross compensation
@@ -2436,9 +2475,42 @@ def fusion_training_program(
         topk_sim, topk_idx = get_gene_feat_sim(
             all_source_fusion_feat, all_target_fusion_feat, len(drugs), K
         )
+
+        # DBSCAN-based positive filtering (SPRED-style)
+        anchor_valid_mask = None
+        if use_dbscan_filter:
+            if dbscan_mode == 'adaptive':
+                topk_sim, topk_idx, anchor_valid_mask, keep_ratio = dbscan_adaptive_neighbors(
+                    all_source_fusion_feat=all_source_fusion_feat,
+                    all_target_fusion_feat=all_target_fusion_feat,
+                    K=K,
+                    eps=dbscan_eps,
+                    min_samples=dbscan_min_samples,
+                    distance=dbscan_distance,
+                    fallback_on_outlier=False,
+                )
+            else:
+                dbscan_mask = dbscan_filter_topk(
+                    all_source_fusion_feat=all_source_fusion_feat,
+                    all_target_fusion_feat=all_target_fusion_feat,
+                    topk_idx=topk_idx,
+                    eps=dbscan_eps,
+                    min_samples=dbscan_min_samples,
+                    distance=dbscan_distance,
+                )
+                keep_ratio = dbscan_mask.mean().item()
+                topk_sim = topk_sim * dbscan_mask
+            print(
+                f"[DBSCAN {dbscan_mode}] epoch {con_epoch}: keep_ratio={keep_ratio:.3f}, "
+                f"eps={dbscan_eps}, min_samples={dbscan_min_samples}, distance={dbscan_distance}"
+            )
+
         datasets = train_dataloader.dataset.tensors
         inputs, label, mask, tissue = datasets[0], datasets[1], datasets[2], datasets[3]
-        sim_data = TensorDataset(inputs, label, mask, tissue, topk_sim, topk_idx)
+        if anchor_valid_mask is not None:
+            sim_data = TensorDataset(inputs, label, mask, tissue, topk_sim, topk_idx, anchor_valid_mask)
+        else:
+            sim_data = TensorDataset(inputs, label, mask, tissue, topk_sim, topk_idx)
         train_dataloader = DataLoader(sim_data, batch_size=batch_size, shuffle=False)
 
         # Phase 12: compute VCB beta with warm-up

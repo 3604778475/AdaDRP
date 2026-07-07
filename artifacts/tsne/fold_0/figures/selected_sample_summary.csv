@@ -1,0 +1,27 @@
+tissue,tissue_name,status,n_selected_per_domain,source_available,target_available
+0,Adrenal Gland,paired,1,1,1
+1,Bladder,paired,14,14,91
+2,Bone,unpaired_source_only,0,14,0
+3,Brain,paired,34,34,129
+4,Breast,paired,34,34,183
+5,Colon,paired,35,35,42
+6,Esophagus/Stomach,unpaired_target_only,0,0,134
+9,Gallbladder,paired,1,1,8
+11,Head and Neck,paired,20,20,76
+12,Kidney,paired,4,14,4
+14,Liver,paired,7,13,7
+15,Lung,paired,100,112,157
+16,Lymphoid,unpaired_source_only,0,67,0
+18,Myeloid,unpaired_source_only,0,25,0
+19,Nervous System,unpaired_source_only,0,15,0
+21,Ovarian,paired,7,28,7
+22,Pancreas,paired,25,25,74
+23,Prostate,paired,3,3,3
+24,Sarcoma,unpaired_target_only,0,0,52
+25,Skin,paired,12,30,12
+26,Soft Tissue,unpaired_source_only,0,8,0
+27,Stomach,unpaired_source_only,0,42,0
+28,Testis,paired,2,2,52
+29,Thymoma,paired,3,3,3
+30,Thyroid,paired,2,9,2
+31,Uterine,paired,23,23,149

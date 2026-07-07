@@ -1,0 +1,281 @@
+x,y,domain,tissue,tissue_name
+-3.9863229,-0.5282857,source,1,Bladder
+3.6977668,-3.6806638,source,31,Uterine
+6.171818,-4.031091,source,15,Lung
+-0.13611747,-2.899428,source,11,Head and Neck
+-2.827748,-0.2030346,source,5,Colon
+4.8817034,-3.4427211,source,15,Lung
+-2.7329073,-0.87905204,source,11,Head and Neck
+5.087076,-3.5208545,source,15,Lung
+-4.551224,-0.085229754,source,5,Colon
+-3.9330459,1.3881556,source,5,Colon
+-3.495872,1.9551798,source,9,Gallbladder
+-3.8275077,0.09929421,source,5,Colon
+-2.12582,-1.6935054,source,31,Uterine
+0.05859211,-3.212722,source,5,Colon
+-4.18449,0.4127179,source,5,Colon
+-3.840902,-0.89124256,source,31,Uterine
+-0.65880495,-2.6041796,source,11,Head and Neck
+3.436452,-4.2369437,source,1,Bladder
+-3.16347,0.17953496,source,5,Colon
+-1.5942202,-1.154507,source,1,Bladder
+-1.24754,-4.678045,source,5,Colon
+-3.9145763,-0.38641807,source,5,Colon
+-2.254263,-0.42917946,source,5,Colon
+5.5128446,-2.9426816,source,15,Lung
+0.28308457,-2.9504802,source,1,Bladder
+0.22892919,-2.477977,source,11,Head and Neck
+-1.875398,-1.6292231,source,11,Head and Neck
+0.0787174,-2.8119614,source,11,Head and Neck
+1.7794278,-3.6405315,source,15,Lung
+-3.0095875,-1.2889729,source,5,Colon
+-2.5885694,3.0367227,source,31,Uterine
+-4.3266363,-0.09379209,source,5,Colon
+-1.9849844,-2.4241729,source,5,Colon
+-4.349426,0.89915574,source,15,Lung
+4.88131,-3.5848742,source,15,Lung
+-3.669603,2.1612372,source,15,Lung
+-3.5765965,0.8290275,source,5,Colon
+1.7434154,-4.2507415,source,31,Uterine
+-3.68895,-0.11071295,source,5,Colon
+-3.2571824,-1.3149079,source,31,Uterine
+6.635917,-3.4762902,source,15,Lung
+-4.005084,0.25492632,source,15,Lung
+1.0752554,-3.4603317,source,1,Bladder
+-2.5105977,-0.20017402,source,5,Colon
+1.2373692,-4.004215,source,5,Colon
+-2.951853,-1.7633449,source,11,Head and Neck
+-0.15189825,-1.9647313,source,11,Head and Neck
+-0.9858079,-2.0628972,source,11,Head and Neck
+-3.8240025,0.2248617,source,5,Colon
+6.855376,-3.17205,source,15,Lung
+6.734821,-1.3103513,source,15,Lung
+-3.4408212,-0.80009705,source,5,Colon
+-1.6577766,2.424344,source,31,Uterine
+-2.4819436,-1.8239367,source,31,Uterine
+3.8856626,-2.5993335,source,31,Uterine
+6.0595436,-2.693186,source,1,Bladder
+-0.09512,-2.3048475,source,11,Head and Neck
+-3.5506296,0.85387033,source,31,Uterine
+-3.8847601,2.3567991,source,30,Thyroid
+-0.63873476,-3.388609,source,23,Prostate
+-0.4496588,-2.9960606,source,11,Head and Neck
+-4.319552,-0.25443727,source,5,Colon
+-0.4862895,-2.8197625,source,11,Head and Neck
+-3.5747473,-0.20058423,source,5,Colon
+-4.2134066,0.89774,source,1,Bladder
+2.4469519,-3.9929423,source,1,Bladder
+0.34114507,-2.7415833,source,11,Head and Neck
+-0.814158,-0.7301771,source,11,Head and Neck
+-0.76832205,-2.5170617,source,31,Uterine
+-4.4967575,0.5433983,source,15,Lung
+-4.040619,1.5055963,source,1,Bladder
+-2.685066,-1.1081501,source,5,Colon
+-2.2018867,-1.1164385,source,1,Bladder
+-3.0184364,-0.8593664,source,5,Colon
+3.07901,-4.2848735,source,5,Colon
+-1.3318235,-2.143128,source,31,Uterine
+0.20507471,-3.330854,source,15,Lung
+6.9508147,-3.037932,source,15,Lung
+0.6557585,-2.7414362,source,15,Lung
+1.0707707,-2.2309487,source,1,Bladder
+-3.9884508,1.5198075,source,9,Gallbladder
+-3.5403774,2.2207408,source,15,Lung
+2.735256,-4.2265296,source,15,Lung
+-1.9129049,-2.0413954,source,11,Head and Neck
+-0.9763447,-1.697061,source,15,Lung
+-3.3752105,0.20990238,source,31,Uterine
+-0.6478677,-2.507156,source,1,Bladder
+-3.3771596,0.44001672,source,15,Lung
+-3.518147,1.5812194,source,9,Gallbladder
+-2.7086515,0.4392878,source,15,Lung
+6.6298366,-3.355122,source,15,Lung
+-3.7601218,-1.3516026,source,5,Colon
+6.493435,-3.5308695,source,15,Lung
+6.4996433,-3.482183,source,15,Lung
+4.225566,-4.326852,source,31,Uterine
+6.315253,-3.6818366,source,15,Lung
+-2.429288,2.9099503,source,15,Lung
+2.2611904,-3.832376,source,31,Uterine
+-4.4988804,-0.47760177,source,31,Uterine
+6.012564,-4.0564723,source,15,Lung
+-2.6061378,-1.3592185,source,1,Bladder
+-4.735126,1.6298385,source,31,Uterine
+5.4883103,-2.712513,source,15,Lung
+-0.75794977,-2.6886382,source,11,Head and Neck
+5.138976,-4.192404,source,15,Lung
+-3.5718026,0.45345202,source,5,Colon
+4.9164524,-3.9497223,source,15,Lung
+-2.3742008,0.20584433,source,15,Lung
+5.4903116,-3.4072373,source,1,Bladder
+-3.3045466,-1.4196825,source,5,Colon
+1.1056694,-3.9458866,source,31,Uterine
+-1.4211338,-1.8633633,source,11,Head and Neck
+4.142815,-4.0546064,source,15,Lung
+6.6280203,-3.5783608,source,15,Lung
+4.9130616,-3.2267964,source,30,Thyroid
+0.55198747,-3.0783968,source,11,Head and Neck
+4.485675,-3.7328312,source,15,Lung
+-1.1066172,-2.1763065,source,5,Colon
+-0.79297775,-0.87149155,source,11,Head and Neck
+-3.4708602,0.8216439,source,1,Bladder
+-4.2350674,0.5439018,source,5,Colon
+6.450384,-3.733253,source,15,Lung
+-3.9721541,-0.17574276,source,5,Colon
+-4.6572227,-0.2869428,source,15,Lung
+-2.9726784,0.71337825,source,5,Colon
+-3.4783587,0.14688466,source,5,Colon
+-1.4859185,-1.9704639,source,11,Head and Neck
+-1.856903,-1.3134631,source,5,Colon
+2.2358994,-4.2326584,source,31,Uterine
+-2.3101182,-1.7853338,source,11,Head and Neck
+-1.8089329,-3.1903193,source,15,Lung
+-3.1450636,2.4606433,source,15,Lung
+1.865478,-3.9163227,source,15,Lung
+4.5424213,-2.326591,source,31,Uterine
+-1.073372,-3.1849604,source,23,Prostate
+-2.987444,-0.46101156,source,31,Uterine
+-1.7642796,0.01962067,source,11,Head and Neck
+-0.9617365,0.26004115,source,23,Prostate
+3.749532,-2.4429772,source,15,Lung
+-4.2661266,-0.77135104,source,31,Uterine
+5.4166684,-2.658208,target,15,Lung
+5.0279193,-3.7067065,target,15,Lung
+5.294747,-4.713768,target,15,Lung
+4.770308,-3.583082,target,9,Gallbladder
+-5.821841,0.265009,target,15,Lung
+-3.4519074,2.806942,target,15,Lung
+5.6889486,-3.6053014,target,15,Lung
+5.032964,-2.9199286,target,15,Lung
+6.6325603,-2.848532,target,15,Lung
+4.9189205,-3.1014411,target,15,Lung
+-0.51716125,-4.508782,target,15,Lung
+6.269544,-2.6611288,target,15,Lung
+5.5359497,-3.3379834,target,15,Lung
+6.2756257,-2.2847638,target,15,Lung
+7.181501,-2.1333477,target,15,Lung
+5.7238445,-3.9361384,target,15,Lung
+0.7056956,-3.2668557,target,15,Lung
+4.317883,-3.7736099,target,15,Lung
+5.9839506,-4.134005,target,15,Lung
+6.5223293,-3.882994,target,15,Lung
+5.105582,-4.2640247,target,15,Lung
+5.4569244,-3.8416576,target,15,Lung
+7.284355,-1.8287741,target,15,Lung
+6.890962,-2.046251,target,15,Lung
+0.79320586,-3.6104338,target,15,Lung
+6.0350423,-3.221978,target,15,Lung
+-3.6738493,2.76027,target,15,Lung
+3.2865355,-3.727271,target,15,Lung
+-3.8672411,2.7741673,target,15,Lung
+-3.0876393,2.6965263,target,15,Lung
+-4.090855,2.4310088,target,15,Lung
+-2.3496244,2.9287117,target,5,Colon
+4.187511,-4.4658127,target,5,Colon
+-1.9935205,1.2670871,target,5,Colon
+-4.628332,1.5619812,target,5,Colon
+-3.1711576,0.4925145,target,5,Colon
+-4.2469654,0.5421387,target,5,Colon
+4.1206384,-3.9157689,target,5,Colon
+-3.3508077,1.8941126,target,5,Colon
+-4.382236,-0.04997604,target,5,Colon
+-1.7622412,1.2146538,target,5,Colon
+-4.0596004,0.013512189,target,5,Colon
+4.95119,-4.014219,target,31,Uterine
+5.1821895,-1.8066087,target,31,Uterine
+-5.2843256,0.83101654,target,31,Uterine
+-4.5557146,0.19363432,target,5,Colon
+-3.1340768,2.12078,target,5,Colon
+-4.4803743,0.28605595,target,5,Colon
+-0.039457284,-2.843837,target,11,Head and Neck
+3.668541,-3.9329333,target,11,Head and Neck
+3.2965047,-4.070163,target,11,Head and Neck
+5.8211093,-4.0678287,target,1,Bladder
+-2.215635,1.798509,target,5,Colon
+-3.7938855,-0.17120793,target,5,Colon
+-4.116123,-1.3598788,target,5,Colon
+-4.2559295,1.0787996,target,5,Colon
+-2.6970487,0.6184895,target,5,Colon
+-2.9650617,0.11611233,target,5,Colon
+4.874582,-2.7534757,target,5,Colon
+5.984775,-3.434578,target,30,Thyroid
+5.9601655,-3.4625916,target,30,Thyroid
+-5.709986,-0.24473707,target,1,Bladder
+-1.7671934,-0.6898331,target,5,Colon
+-3.8901794,0.846289,target,5,Colon
+2.9243658,-3.2204666,target,11,Head and Neck
+0.6102049,-2.9803019,target,11,Head and Neck
+1.1723331,-2.9500515,target,11,Head and Neck
+1.0874254,-3.0284505,target,11,Head and Neck
+-5.3873954,1.2556903,target,11,Head and Neck
+6.3877697,-3.229294,target,11,Head and Neck
+6.1023226,-3.7959049,target,1,Bladder
+6.337051,-3.3998804,target,1,Bladder
+6.980079,-2.7388997,target,11,Head and Neck
+-0.7933528,-1.5734799,target,11,Head and Neck
+5.122917,-2.346956,target,31,Uterine
+1.3155802,-4.157889,target,31,Uterine
+-4.040553,2.0881917,target,31,Uterine
+7.1439614,-2.9083312,target,31,Uterine
+6.0002484,-2.4894338,target,31,Uterine
+4.090079,-4.390127,target,5,Colon
+-2.621727,-0.12574774,target,5,Colon
+4.846998,-3.6755686,target,5,Colon
+-2.5805097,1.109239,target,5,Colon
+0.57029426,-3.0685387,target,11,Head and Neck
+-4.769461,0.22457403,target,1,Bladder
+6.282516,-3.728075,target,1,Bladder
+-5.336068,-0.045671813,target,1,Bladder
+2.875482,-4.427687,target,1,Bladder
+-1.5305041,0.59806126,target,23,Prostate
+-4.719035,-0.46693558,target,1,Bladder
+-5.1418843,0.14533253,target,1,Bladder
+0.0892015,-2.483139,target,11,Head and Neck
+-2.821118,1.4852908,target,11,Head and Neck
+1.6188866,-3.4832537,target,11,Head and Neck
+1.7716247,-3.5636106,target,31,Uterine
+4.4581985,-4.769048,target,11,Head and Neck
+-5.7046704,0.049055375,target,31,Uterine
+5.0723357,-3.9487958,target,31,Uterine
+-2.4798908,-0.01176036,target,1,Bladder
+-0.9938825,0.5410528,target,23,Prostate
+4.6368423,-2.802333,target,15,Lung
+6.6221933,-2.2740104,target,15,Lung
+5.419667,-3.9970481,target,15,Lung
+-3.7645733,2.371122,target,15,Lung
+0.47731456,-3.7037282,target,31,Uterine
+4.017324,-4.512528,target,31,Uterine
+4.4769573,-4.356036,target,31,Uterine
+5.043836,-4.3431516,target,31,Uterine
+2.9677699,-4.315046,target,31,Uterine
+1.2267904,-5.1305203,target,15,Lung
+6.828013,-2.8446333,target,15,Lung
+5.269047,-3.5022879,target,31,Uterine
+-3.835586,0.09609156,target,5,Colon
+-3.8144505,1.2200313,target,5,Colon
+-3.9560108,0.5116028,target,5,Colon
+-3.2641237,-0.69786906,target,5,Colon
+-4.285696,-0.2908535,target,5,Colon
+-2.6647954,-0.53766507,target,5,Colon
+-3.8102772,2.3015802,target,15,Lung
+4.618793,-4.2253966,target,15,Lung
+0.6427153,-2.0356944,target,11,Head and Neck
+1.7773063,-3.296588,target,11,Head and Neck
+3.5499766,-4.1700583,target,11,Head and Neck
+-2.9297144,-3.08339,target,31,Uterine
+-5.540794,0.5079665,target,31,Uterine
+5.3786707,-4.173223,target,15,Lung
+3.132653,-3.7393436,target,11,Head and Neck
+-1.723124,-1.6126331,target,11,Head and Neck
+4.909957,-4.370778,target,15,Lung
+-0.5582954,-2.2040458,target,11,Head and Neck
+-1.2628405,0.8102707,target,23,Prostate
+-1.5181116,-1.6813014,target,31,Uterine
+-4.7875223,0.6600049,target,31,Uterine
+5.1615124,-3.240503,target,31,Uterine
+-4.0748286,-1.1754539,target,9,Gallbladder
+4.2366614,-3.1090379,target,1,Bladder
+-0.54304683,-1.6112621,target,1,Bladder
+1.1739155,-3.3365893,target,1,Bladder
+4.124992,-4.5888615,target,1,Bladder
+-2.6820998,0.7460979,target,9,Gallbladder
