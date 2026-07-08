@@ -33,8 +33,6 @@ def train_tissue_classifier_program(
     lambda_ortho=0.0,
     lambda_recon=0.0,
     lambda_private_domain=0.0,
-    # Gene-set selector query gate
-    lambda_query_gate_l1=0.0,
 ):
     """
     Train ProgramTissueClassifier with optional program auxiliary losses.
@@ -62,8 +60,6 @@ def train_tissue_classifier_program(
         epoch_ortho_loss = 0.0
         epoch_recon_loss = 0.0
         epoch_priv_domain_loss = 0.0
-        epoch_query_gate_loss = 0.0
-
         for (source_batch, target_batch) in zip(s_train, cycle(t_train)):
             source_inputs = source_batch[0].to(device)
             source_labels = source_batch[1].to(device)
@@ -91,13 +87,6 @@ def train_tissue_classifier_program(
                 lambda_div=lambda_div,
                 lambda_sparse=lambda_sparse,
             )
-
-            # Gene-set selector query gate loss
-            query_gate_loss_val = 0.0
-            if "query_gate_loss" in program_out and lambda_query_gate_l1 > 0:
-                query_gate_loss_val = lambda_query_gate_l1 * program_out["query_gate_loss"]
-                aux_loss = aux_loss + query_gate_loss_val
-                epoch_query_gate_loss += query_gate_loss_val.item()
 
             # Target forward
             target_tissue_pred, target_domain_pred, _ = model(target_inputs, domain_idx=target_domain_idx)
@@ -230,8 +219,6 @@ def train_tissue_classifier_program(
                 print(f"  Recon Loss: {epoch_recon_loss / len(s_train):.4f}")
             if lambda_private_domain > 0:
                 print(f"  PrivDomain Loss: {epoch_priv_domain_loss / len(s_train):.4f}")
-            if lambda_query_gate_l1 > 0:
-                print(f"  QueryGate Loss: {epoch_query_gate_loss / len(s_train):.4f}")
             print(f"Source Domain - Train Acc: {s_train_acc:.4f}, Test Acc: {s_test_acc:.4f}")
             print(f"Target Domain - Train Acc: {t_train_acc:.4f}, Test Acc: {t_test_acc:.4f}")
 
