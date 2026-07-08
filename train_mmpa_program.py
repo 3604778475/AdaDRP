@@ -201,7 +201,6 @@ def main(args, update_params_dict, now_time):
         'topk_contrastive': args.K,
         # backbone
         'backbone_type': args.backbone_type,
-        'norm_type': args.norm_type,
         'num_gene_tokens': args.num_gene_tokens,
         'token_dim': args.token_dim,
         'convnext_depth': args.convnext_depth,
@@ -254,7 +253,6 @@ def main(args, update_params_dict, now_time):
         hidden_dims=[512, 256, 128, 64],
         drop=0.2,
         backbone_type=args.backbone_type,
-        norm_type=args.norm_type,
         num_gene_tokens=args.num_gene_tokens,
         token_dim=args.token_dim,
         convnext_depth=args.convnext_depth,
@@ -466,11 +464,8 @@ if __name__ == '__main__':
                         help='Contrastive epochs')
 
     parser.add_argument('--backbone_type', type=str, default='convnext1d',
-                        choices=['mlp', 'grn_mlp', 'convnext1d', 'resnet'],
+                        choices=['mlp', 'convnext1d', 'resnet'],
                         help='Backbone type for MolecularProgramEncoder')
-    parser.add_argument('--norm_type', type=str, default='layernorm',
-                        choices=['layernorm', 'batchnorm'],
-                        help='Normalization type for GRN-MLP')
     parser.add_argument('--num_gene_tokens', type=int, default=64,
                         help='Number of gene tokens for ConvNeXt1D tokenizer')
     parser.add_argument('--token_dim', type=int, default=64,

@@ -20,7 +20,7 @@ import torch.nn.functional as F
 from copy import deepcopy
 import config
 
-from mmpa_drp.backbones import GRNMLPBackbone, ConvNeXt1DBackbone, ResNetBackbone
+from mmpa_drp.backbones import ConvNeXt1DBackbone, ResNetBackbone
 from mmpa_drp.fragment_encoder import DrugFragmentEncoder
 from mmpa_drp.fpi import FragmentProgramInteraction
 
@@ -38,8 +38,8 @@ class MolecularProgramEncoder(nn.Module):
 
     Phase 5: Supports multiple backbone types:
         - "mlp": original MLP backbone (Phase 2 compatible)
-        - "grn_mlp": GRN-enhanced 2-layer MLP
         - "convnext1d": ConvNeXt V2-inspired 1D backbone
+        - "resnet": Original MACB residual MLP backbone
     """
 
     def __init__(
@@ -92,22 +92,6 @@ class MolecularProgramEncoder(nn.Module):
                 )
             self.backbone = nn.Sequential(*modules)
             self.backbone_output_dim = hidden_dims[-1]
-
-        elif backbone_type == "grn_mlp":
-            if hidden_dims is None:
-                hidden_dims = [512, 256, 128]
-            # For GRN-MLP we use the last hidden_dim as the backbone output dim.
-            # If hidden_dims has multiple layers, we keep the original structure
-            # but replace with GRN-enhanced blocks.
-            # Simplified: use a 2-layer GRNMLP with hidden_dim = hidden_dims[-1]
-            grn_hidden = hidden_dims[-1] if hidden_dims else 64
-            self.backbone = GRNMLPBackbone(
-                input_dim=input_dim,
-                hidden_dim=grn_hidden,
-                dropout=drop,
-                norm_type=norm_type,
-            )
-            self.backbone_output_dim = grn_hidden
 
         elif backbone_type == "convnext1d":
             # ConvNeXt uses token_dim internally; final proj maps to hidden_dim

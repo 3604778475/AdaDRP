@@ -2,8 +2,8 @@
 Phase 5: ConvNeXt V2-inspired Backbones for MolecularProgramEncoder
 ====================================================================
 Backbones:
-- GRNMLPBackbone: MLP with GRN (Global Response Normalization)
 - ConvNeXt1DBackbone: 1D ConvNeXt V2 blocks with depthwise conv + GRN
+- ResNetBackbone: Original MACB residual MLP backbone
 
 GRN (Global Response Normalization) from ConvNeXt V2:
 https://arxiv.org/abs/2301.00808
@@ -12,26 +12,6 @@ https://arxiv.org/abs/2301.00808
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-
-class GRN1DVector(nn.Module):
-    """
-    GRN for vector input [B, C].
-    When gamma=beta=0, behaves as identity (residual path only).
-    """
-
-    def __init__(self, dim: int, eps: float = 1e-6):
-        super().__init__()
-        self.eps = eps
-        self.gamma = nn.Parameter(torch.zeros(1, dim))
-        self.beta = nn.Parameter(torch.zeros(1, dim))
-
-    def forward(self, x: torch.Tensor):
-        # x: [B, C]
-        gx = torch.norm(x, p=2, dim=1, keepdim=True)  # [B, 1]
-        nx = gx / (gx.mean(dim=-1, keepdim=True) + self.eps)  # [B, 1]
-        out = self.gamma * (x * nx) + self.beta + x  # [B, C]
-        return out
 
 
 class GRN1DToken(nn.Module):
@@ -52,77 +32,6 @@ class GRN1DToken(nn.Module):
         nx = gx / (gx.mean(dim=-1, keepdim=True) + self.eps)  # [B, 1, C]
         out = self.gamma * (x * nx) + self.beta + x  # [B, L, C]
         return out
-
-
-class GRNMLPBackbone(nn.Module):
-    """
-    2-layer MLP with GRN1DVector normalization.
-    Default: LayerNorm + GELU (stable for small batches).
-    """
-
-    def __init__(
-        self,
-        input_dim: int,
-        hidden_dim: int = 64,
-        dropout: float = 0.1,
-        norm_type: str = "layernorm",
-    ):
-        super().__init__()
-        self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
-        self.norm_type = norm_type
-
-        # Block 1
-        self.fc1 = nn.Linear(input_dim, hidden_dim, bias=True)
-        self.norm1 = self._build_norm(hidden_dim)
-        self.grn1 = GRN1DVector(hidden_dim)
-        self.drop1 = nn.Dropout(dropout)
-
-        # Block 2
-        self.fc2 = nn.Linear(hidden_dim, hidden_dim, bias=True)
-        self.norm2 = self._build_norm(hidden_dim)
-        self.grn2 = GRN1DVector(hidden_dim)
-        self.drop2 = nn.Dropout(dropout)
-
-        self._reset_parameters()
-
-    def _build_norm(self, dim):
-        if self.norm_type == "layernorm":
-            return nn.LayerNorm(dim)
-        elif self.norm_type == "batchnorm":
-            return nn.BatchNorm1d(dim)
-        else:
-            raise ValueError(f"Unknown norm_type: {self.norm_type}")
-
-    def _reset_parameters(self):
-        for m in self.modules():
-            if isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight)
-                if m.bias is not None:
-                    nn.init.zeros_(m.bias)
-
-    def forward(self, x: torch.Tensor):
-        # Block 1
-        h = self.fc1(x)
-        if isinstance(self.norm1, nn.BatchNorm1d):
-            h = self.norm1(h)
-        else:
-            h = self.norm1(h)
-        h = F.gelu(h)
-        h = self.grn1(h)
-        h = self.drop1(h)
-
-        # Block 2
-        h = self.fc2(h)
-        if isinstance(self.norm2, nn.BatchNorm1d):
-            h = self.norm2(h)
-        else:
-            h = self.norm2(h)
-        h = F.gelu(h)
-        h = self.grn2(h)
-        h = self.drop2(h)
-
-        return h
 
 
 class ConvNeXt1DBlock(nn.Module):
