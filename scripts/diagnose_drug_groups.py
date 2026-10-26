@@ -20,11 +20,11 @@ from sklearn.cluster import KMeans
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config
-from mmpa_drp.models import ProgramFusionMLP, ProgramTissueClassifier
+from adadrp.models import ProgramFusionMLP, ProgramTissueClassifier
 from copy import deepcopy
 
 # Pre-import utility to resolve circular import with dataload
-# (mirrors train_mmpa_program.py import order)
+# (mirrors train_adadrp_program.py import order)
 import utility
 
 
@@ -81,7 +81,7 @@ def diagnose_drug_groups(
     )
 
     # Quick stage-1 pretrain
-    from mmpa_drp.stage1_program import train_tissue_classifier_program
+    from adadrp.stage1_program import train_tissue_classifier_program
     trained_model = train_tissue_classifier_program(
         model=pretrain_model,
         s_dataloaders=s_dataloaders,

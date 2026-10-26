@@ -36,7 +36,7 @@ echo "[1/8] Original MACB completed at $(date)"
 # ============================================================
 echo ""
 echo "[2/8] Running Current Best (AUC 0.6188)..."
-python train_mmpa_program.py \
+python train_adadrp_program.py \
     --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5 --train \
     --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7 \
     --num_programs 8 --program_dim 64 --K 3 \
@@ -59,7 +59,7 @@ echo "[2/8] Current Best completed at $(date)"
 # ============================================================
 echo ""
 echo "[3/8] Ablation: Remove FPI..."
-python train_mmpa_program.py \
+python train_adadrp_program.py \
     --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5 --train \
     --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7 \
     --num_programs 8 --program_dim 64 --K 3 \
@@ -79,7 +79,7 @@ echo "[3/8] No FPI completed at $(date)"
 # ============================================================
 echo ""
 echo "[4/8] Ablation: Remove DomainSep..."
-python train_mmpa_program.py \
+python train_adadrp_program.py \
     --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5 --train \
     --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7 \
     --num_programs 8 --program_dim 64 --K 3 \
@@ -100,7 +100,7 @@ echo "[4/8] No DomainSep completed at $(date)"
 # ============================================================
 echo ""
 echo "[5/8] Ablation: Remove OT Alignment..."
-python train_mmpa_program.py \
+python train_adadrp_program.py \
     --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5 --train \
     --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7 \
     --num_programs 8 --program_dim 64 --K 3 \
@@ -121,7 +121,7 @@ echo "[5/8] No OT completed at $(date)"
 # ============================================================
 echo ""
 echo "[6/8] Ablation: Replace ConvNeXt1D with original MACB ResNet backbone..."
-python train_mmpa_program.py \
+python train_adadrp_program.py \
     --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5 --train \
     --backbone_type resnet \
     --num_programs 8 --program_dim 64 --K 3 \
@@ -144,7 +144,7 @@ echo "[6/8] ResNet Backbone completed at $(date)"
 # ============================================================
 echo ""
 echo "[7/8] Ablation: Program Encoder degenerate (num_programs=1)..."
-python train_mmpa_program.py \
+python train_adadrp_program.py \
     --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5 --train \
     --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7 \
     --num_programs 1 --program_dim 64 --K 3 \
@@ -239,7 +239,7 @@ else:
     print("[WARNING] Could not find exact function match for patching")
 PYEOF
 
-python train_mmpa_program.py \
+python train_adadrp_program.py \
     --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5 --train \
     --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7 \
     --num_programs 8 --program_dim 64 --K 3 \

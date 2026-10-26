@@ -24,7 +24,7 @@ for seed in test_seeds:
     
     # 运行实验
     result = subprocess.run([
-        'python', 'train_mmpa_program.py',
+        'python', 'train_adadrp_program.py',
         '--measurement', 'Z_SCORE',
         '--thres_gdsc', '0.0',
         '--thres_label', '0.1',

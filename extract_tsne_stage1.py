@@ -27,7 +27,7 @@ def load_stage1_model(checkpoint_path, device):
         raise FileNotFoundError(f"找不到模型: {checkpoint_path}\n请先训练 Stage1 或检查路径")
     
     # 导入模型类
-    from mmpa_drp.models import ProgramTissueClassifier
+    from adadrp.models import ProgramTissueClassifier
     import config
     
     # 读取 gex 特征维度

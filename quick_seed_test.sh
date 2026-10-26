@@ -9,10 +9,10 @@ for SEED in "${SEEDS[@]}"; do
     echo "=========================================="
     
     # 修改种子
-    sed -i "s/seed = 2025/seed = $SEED/" train_mmpa_program.py
+    sed -i "s/seed = 2025/seed = $SEED/" train_adadrp_program.py
     
     # 运行实验
-    python train_mmpa_program.py \
+    python train_adadrp_program.py \
         --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5 \
         --alph 0.3 --beta 0.3 --train \
         --num_programs 8 --program_dim 64 \
@@ -28,4 +28,4 @@ for SEED in "${SEEDS[@]}"; do
 done
 
 # 恢复原始种子
-sed -i "s/seed = [0-9]*/seed = 2025/" train_mmpa_program.py
+sed -i "s/seed = [0-9]*/seed = 2025/" train_adadrp_program.py

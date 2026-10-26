@@ -94,7 +94,7 @@ LOGDIR_MAX_WAIT = 300  # 5 minutes
 
 
 def build_param_str(params):
-    """Reconstruct param_str for validation (must match train_mmpa_program.py logic)."""
+    """Reconstruct param_str for validation (must match train_adadrp_program.py logic)."""
     ps = f"pretrain_num_epochs_{params['pretrain_num_epochs']}"
     ps += f"_train_num_epochs_{params['train_num_epochs']}"
     ps += f"_contrastive_num_epochs_{params['contrastive_num_epochs']}"
@@ -119,7 +119,7 @@ def build_param_str(params):
 
 def build_cmd(params):
     """Build command-line argument list from parameter dict."""
-    cmd = ['python', 'train_mmpa_program.py', '--train']
+    cmd = ['python', 'train_adadrp_program.py', '--train']
     for key, val in params.items():
         if isinstance(val, bool):
             if val:
@@ -190,7 +190,7 @@ def backup_results(expected_param_str):
     os.makedirs(results_backup_dir, exist_ok=True)
     
     for fold_dir in glob.glob('results/fold-*'):
-        for csv_file in glob.glob(os.path.join(fold_dir, f'{expected_param_str}_mmpa.csv')):
+        for csv_file in glob.glob(os.path.join(fold_dir, f'{expected_param_str}_adadrp.csv')):
             if os.path.exists(csv_file):
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                 backup_name = f"{os.path.basename(csv_file)}.{timestamp}"
@@ -211,7 +211,7 @@ def run_single_experiment(param_name, param_value, params, section_label):
     existing_dirs = get_existing_log_dirs()
     cmd = build_cmd(params)
     
-    print(f"  Command: python train_mmpa_program.py --train ... --{param_name} {param_value}")
+    print(f"  Command: python train_adadrp_program.py --train ... --{param_name} {param_value}")
     
     # Backup existing results to prevent overwrite
     backup_results(expected_param_str)

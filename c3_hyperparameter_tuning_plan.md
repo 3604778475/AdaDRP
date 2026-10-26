@@ -217,25 +217,25 @@ best_auc: 0.5924
 
 ```bash
 # 1. lambda_ot 筛选（3 个实验）
-python train_mmpa_program.py ... --lambda_ot 0.005 --n 2
-python train_mmpa_program.py ... --lambda_ot 0.01  --n 2  # baseline
-python train_mmpa_program.py ... --lambda_ot 0.02  --n 2
+python train_adadrp_program.py ... --lambda_ot 0.005 --n 2
+python train_adadrp_program.py ... --lambda_ot 0.01  --n 2  # baseline
+python train_adadrp_program.py ... --lambda_ot 0.02  --n 2
 
 # 2. K 筛选（4 个实验）
-python train_mmpa_program.py ... --beta 0.3 --K 3 --n 2
-python train_mmpa_program.py ... --beta 0.3 --K 5 --n 2
-python train_mmpa_program.py ... --beta 0.3 --K 7 --n 2  # baseline
-python train_mmpa_program.py ... --beta 0.3 --K 9 --n 2
+python train_adadrp_program.py ... --beta 0.3 --K 3 --n 2
+python train_adadrp_program.py ... --beta 0.3 --K 5 --n 2
+python train_adadrp_program.py ... --beta 0.3 --K 7 --n 2  # baseline
+python train_adadrp_program.py ... --beta 0.3 --K 9 --n 2
 
 # 3. alpha 筛选（3 个实验）
-python train_mmpa_program.py ... --alph 0.1 --n 2
-python train_mmpa_program.py ... --alph 0.3 --n 2  # baseline
-python train_mmpa_program.py ... --alph 0.5 --n 2
+python train_adadrp_program.py ... --alph 0.1 --n 2
+python train_adadrp_program.py ... --alph 0.3 --n 2  # baseline
+python train_adadrp_program.py ... --alph 0.5 --n 2
 
 # 4. beta 筛选（3 个实验）
-python train_mmpa_program.py ... --beta 0.1 --K 7 --n 2
-python train_mmpa_program.py ... --beta 0.3 --K 7 --n 2  # baseline
-python train_mmpa_program.py ... --beta 0.5 --K 7 --n 2
+python train_adadrp_program.py ... --beta 0.1 --K 7 --n 2
+python train_adadrp_program.py ... --beta 0.3 --K 7 --n 2  # baseline
+python train_adadrp_program.py ... --beta 0.5 --K 7 --n 2
 ```
 
 **总计：13 个实验 × ~20 分钟 = ~4.5 小时**

@@ -28,7 +28,7 @@ DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 # 必须先导入 utility 避免循环导入
 from utility import *
 from dataload import get_unlabeled_dataloaders
-from mmpa_drp.models import ProgramTissueClassifier
+from adadrp.models import ProgramTissueClassifier
 import config
 
 
@@ -278,7 +278,7 @@ def main():
                       os.path.join(SAVE_DIR, f"tsne_{fold_name}_fused_drug0.png"))
     else:
         print(f"\n跳过 Stage2/3: 找不到预存特征匹配 {STAGE2_FEATURE_PATTERN}")
-        print("  请重新运行 train_mmpa_program.py，训练时会自动保存 Stage2/3 特征。")
+        print("  请重新运行 train_adadrp_program.py，训练时会自动保存 Stage2/3 特征。")
 
     # ============== 性能图 ==============
     print("\n===== 药物性能可视化 =====")

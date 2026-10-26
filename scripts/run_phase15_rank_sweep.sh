@@ -26,47 +26,47 @@ echo "========================================"
 
 # 1. Baseline (no rank loss code path)
 echo "[1/7] Running BASELINE (no rank loss)..."
-python train_mmpa_program.py ${BASE_FLAGS} \
+python train_adadrp_program.py ${BASE_FLAGS} \
     --output_dir outputs/phase15/baseline
 
 # 2. Control run: rank loss enabled but lambda=0
 echo "[2/7] Running CONTROL (rank enabled, lambda=0)..."
-python train_mmpa_program.py ${BASE_FLAGS} \
+python train_adadrp_program.py ${BASE_FLAGS} \
     --use_rank_loss --lambda_rank 0.0 \
     --ranking_log_grad_ratio --ranking_log_drugwise_pair_acc \
     --output_dir outputs/phase15/rank_lam0
 
 # 3. lambda_rank = 0.05
 echo "[3/7] Running lambda_rank=0.05..."
-python train_mmpa_program.py ${BASE_FLAGS} \
+python train_adadrp_program.py ${BASE_FLAGS} \
     --use_rank_loss --lambda_rank 0.05 --ranking_warmup_epochs 20 \
     --ranking_log_grad_ratio --ranking_log_drugwise_pair_acc \
     --output_dir outputs/phase15/rank_lam005
 
 # 4. lambda_rank = 0.10
 echo "[4/7] Running lambda_rank=0.10..."
-python train_mmpa_program.py ${BASE_FLAGS} \
+python train_adadrp_program.py ${BASE_FLAGS} \
     --use_rank_loss --lambda_rank 0.10 --ranking_warmup_epochs 20 \
     --ranking_log_grad_ratio --ranking_log_drugwise_pair_acc \
     --output_dir outputs/phase15/rank_lam010
 
 # 5. lambda_rank = 0.20
 echo "[5/7] Running lambda_rank=0.20..."
-python train_mmpa_program.py ${BASE_FLAGS} \
+python train_adadrp_program.py ${BASE_FLAGS} \
     --use_rank_loss --lambda_rank 0.20 --ranking_warmup_epochs 20 \
     --ranking_log_grad_ratio --ranking_log_drugwise_pair_acc \
     --output_dir outputs/phase15/rank_lam020
 
 # 6. lambda_rank = 0.30
 echo "[6/7] Running lambda_rank=0.30..."
-python train_mmpa_program.py ${BASE_FLAGS} \
+python train_adadrp_program.py ${BASE_FLAGS} \
     --use_rank_loss --lambda_rank 0.30 --ranking_warmup_epochs 20 \
     --ranking_log_grad_ratio --ranking_log_drugwise_pair_acc \
     --output_dir outputs/phase15/rank_lam030
 
 # 7. lambda_rank = 0.50
 echo "[7/7] Running lambda_rank=0.50..."
-python train_mmpa_program.py ${BASE_FLAGS} \
+python train_adadrp_program.py ${BASE_FLAGS} \
     --use_rank_loss --lambda_rank 0.50 --ranking_warmup_epochs 20 \
     --ranking_log_grad_ratio --ranking_log_drugwise_pair_acc \
     --output_dir outputs/phase15/rank_lam050

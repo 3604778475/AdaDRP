@@ -5,7 +5,7 @@
 # Usage:
 #   bash scripts/run_k_sweep.sh
 #
-# This script runs the baseline MMPA-DRP configuration with different values
+# This script runs the baseline AdaDRP configuration with different values
 # of K (num_programs) and saves each experiment to a separate output directory.
 #
 # Fixed parameters are taken from the current best configuration (AUC ~0.6351).
@@ -45,7 +45,7 @@ for K in "${K_VALUES[@]}"; do
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Running K=${K} ..."
     echo ""
 
-    python train_mmpa_program.py ${COMMON_FLAGS} \
+    python train_adadrp_program.py ${COMMON_FLAGS} \
         --num_programs ${K} \
         --output_dir ${BASE_OUTPUT_DIR}/k${K}
 

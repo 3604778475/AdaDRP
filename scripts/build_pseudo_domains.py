@@ -26,7 +26,7 @@ from sklearn.preprocessing import normalize
 import config
 from utility import set_seed, safe_make_dir
 from dataload import get_unlabeled_dataloaders
-from mmpa_drp.models import ProgramTissueClassifier
+from adadrp.models import ProgramTissueClassifier
 
 
 def extract_h_pool_from_checkpoint(checkpoint_path, gex_features_df, device, seed=2025):

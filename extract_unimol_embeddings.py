@@ -1,7 +1,7 @@
 """
 extract_unimol_embeddings.py
 ============================
-Offline script to extract Uni-Mol embeddings for drugs used in MMPA-DRP.
+Offline script to extract Uni-Mol embeddings for drugs used in AdaDRP.
 
 Usage:
     python extract_unimol_embeddings.py --output data/drug_unimol_emb.npy
@@ -125,7 +125,7 @@ def extract_embeddings(smiles_list, model_name="unimolv1", remove_hs=False):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Extract Uni-Mol embeddings for MMPA-DRP drugs")
+    parser = argparse.ArgumentParser(description="Extract Uni-Mol embeddings for AdaDRP drugs")
     parser.add_argument(
         "--drug_smiles_csv",
         type=str,

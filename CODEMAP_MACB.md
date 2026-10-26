@@ -1,9 +1,9 @@
-# CODEMAP_MACB.md — MACB-DRP Code Structure & MMPA-DRP Migration Plan
+# CODEMAP_MACB.md — MACB-DRP Code Structure & AdaDRP Migration Plan
 
-> **Project**: MACB-DRP → MMPA-DRP  
+> **Project**: MACB-DRP → AdaDRP  
 > **Phase**: 1 + 2 (Code structure梳理 + Safe extension interfaces + MolecularProgramEncoder 接入)  
 > **Date**: 2026-05-11  
-> **Rule**: 所有原始 MACB-DRP 文件禁止直接重命名/删除；新增 MMPA 模块必须与原始代码并存。
+> **Rule**: 所有原始 MACB-DRP 文件禁止直接重命名/删除；新增 AdaDRP 模块必须与原始代码并存。
 
 ---
 
@@ -57,10 +57,10 @@ auc_aupr_metrics：0.6290/0.1706
 
 ---
 
-## 2. 如何运行 MMPA-DRP Phase 2
+## 2. 如何运行 AdaDRP Phase 2
 
 ```bash
-python train_mmpa_program.py \
+python train_adadrp_program.py \
   --measurement Z_SCORE \
   --thres_gdsc 0.0 \
   --thres_label 0.1 \
@@ -75,7 +75,7 @@ python train_mmpa_program.py \
 ```
 
 
-MMPA 专属参数：
+AdaDRP 专属参数：
 - `--num_programs`: 分子程序数量（默认 8），即 `MolecularProgramEncoder` 输出的 program tokens 个数
 - `--program_dim`: 每个程序 token 的维度（默认 64）
 - `--lambda_div`: diversity loss 权重（默认 0.01）
@@ -108,15 +108,15 @@ MMPA 专属参数：
 | `Fusion_MLP` | Stage 2 核心：bilinear fusion + CDAN + response predictor |
 | `ReverseLayerF` | Gradient Reversal Layer（用于 adversarial domain adaptation） |
 
-### MMPA-DRP 新增 / 替换模型
+### AdaDRP 新增 / 替换模型
 
 | 文件 | 类 | 说明 |
 |------|-----|------|
-| `mmpa_drp/models.py` | `MolecularProgramEncoder` | Gene encoder 替换模块。输入 `x:[B,G]`，输出 `{"z":[B,K,d], "q":[B,K], "h":[B,d]}`，其中 `h = sum_k q_k * z_k` |
-| `mmpa_drp/models.py` | `ProgramTissueClassifier` | Stage 1 替代 `ResNetTissueClassifier`。封装 `MolecularProgramEncoder` + tissue classifier + domain discriminator，接口与原模型完全一致 `(tissue_pred, domain_pred, gene_feat)` |
-| `mmpa_drp/models.py` | `ProgramFusionMLP` | Stage 2/3 替代 `Fusion_MLP`。`encoder` 接收返回 dict 的 `MolecularProgramEncoder`，其余 bilinear/CDAN/predictor 逻辑完全保留 |
-| `mmpa_drp/models.py` | `DrugMechanismGate` | Phase 1 占位（未接入训练） |
-| `mmpa_drp/models.py` | `DrugGatedProgramAggregator` | Phase 1 占位（未接入训练） |
+| `adadrp/models.py` | `MolecularProgramEncoder` | Gene encoder 替换模块。输入 `x:[B,G]`，输出 `{"z":[B,K,d], "q":[B,K], "h":[B,d]}`，其中 `h = sum_k q_k * z_k` |
+| `adadrp/models.py` | `ProgramTissueClassifier` | Stage 1 替代 `ResNetTissueClassifier`。封装 `MolecularProgramEncoder` + tissue classifier + domain discriminator，接口与原模型完全一致 `(tissue_pred, domain_pred, gene_feat)` |
+| `adadrp/models.py` | `ProgramFusionMLP` | Stage 2/3 替代 `Fusion_MLP`。`encoder` 接收返回 dict 的 `MolecularProgramEncoder`，其余 bilinear/CDAN/predictor 逻辑完全保留 |
+| `adadrp/models.py` | `DrugMechanismGate` | Phase 1 占位（未接入训练） |
+| `adadrp/models.py` | `DrugGatedProgramAggregator` | Phase 1 占位（未接入训练） |
 
 ---
 
@@ -133,14 +133,14 @@ MMPA 专属参数：
 | **Adversarial Loss** | `pretraining.py` | `nn.BCEWithLogitsLoss()` (domain binary classification) |
 | **Stage 1 训练函数** | `pretraining.py` | `train_tissue_classifier(...)` |
 
-### MMPA 替代对应文件
+### AdaDRP 替代对应文件
 
 | 组件 | 文件 | 类 / 函数 |
 |------|------|-----------|
-| **Gene Encoder (Program)** | `mmpa_drp/models.py` | `MolecularProgramEncoder` |
-| **Tissue Classifier (Program)** | `mmpa_drp/models.py` | `ProgramTissueClassifier` |
-| **Stage 1 训练函数 (Program)** | `mmpa_drp/stage1_program.py` | `train_tissue_classifier_program(...)` |
-| **Feature Save (Program)** | `mmpa_drp/stage1_program.py` | `save_feat_program(...)` |
+| **Gene Encoder (Program)** | `adadrp/models.py` | `MolecularProgramEncoder` |
+| **Tissue Classifier (Program)** | `adadrp/models.py` | `ProgramTissueClassifier` |
+| **Stage 1 训练函数 (Program)** | `adadrp/stage1_program.py` | `train_tissue_classifier_program(...)` |
+| **Feature Save (Program)** | `adadrp/stage1_program.py` | `save_feat_program(...)` |
 
 ### 关键输出形状
 
@@ -150,7 +150,7 @@ tissue_pred, domain_pred, attended_features = model(x)
 # attended_features 即 gene representation h
 # h shape: [B, 64]
 
-# MMPA ProgramTissueClassifier
+# AdaDRP ProgramTissueClassifier
 tissue_pred, domain_pred, gene_feat = model(x)
 # gene_feat 即 h_pool，由 MolecularProgramEncoder 聚合得到
 # h_pool shape: [B, 64]  （与原 h 完全一致）
@@ -166,9 +166,9 @@ out["h"].shape  # [B, d]
 
 | Loss | 文件 | 函数 | 权重 |
 |------|------|------|------|
-| Reconstruction Loss | `mmpa_drp/losses.py` | `program_reconstruction_loss` | 0.0（本阶段未实现 decoder） |
-| Diversity Loss | `mmpa_drp/losses.py` | `program_diversity_loss` | `lambda_div`（默认 0.01） |
-| Sparsity Loss | `mmpa_drp/losses.py` | `program_sparsity_loss` | `lambda_sparse`（默认 0.001） |
+| Reconstruction Loss | `adadrp/losses.py` | `program_reconstruction_loss` | 0.0（本阶段未实现 decoder） |
+| Diversity Loss | `adadrp/losses.py` | `program_diversity_loss` | `lambda_div`（默认 0.01） |
+| Sparsity Loss | `adadrp/losses.py` | `program_sparsity_loss` | `lambda_sparse`（默认 0.001） |
 
 ---
 
@@ -186,12 +186,12 @@ out["h"].shape  # [B, d]
 | **CDAN Loss** | `finetune.py` | `nn.BCEWithLogitsLoss()`（domain discriminator binary loss） |
 | **Stage 2 训练函数** | `finetune.py` | `fusion_model_train_step(...)` |
 
-### MMPA 替代对应文件
+### AdaDRP 替代对应文件
 
 | 组件 | 文件 | 类 / 函数 |
 |------|------|-----------|
-| **Fusion Model (Program)** | `mmpa_drp/models.py` | `ProgramFusionMLP` |
-| **Stage 2&3 训练函数 (Program)** | `mmpa_drp/stage2_program.py` | `fusion_training_program(...)` |
+| **Fusion Model (Program)** | `adadrp/models.py` | `ProgramFusionMLP` |
+| **Stage 2&3 训练函数 (Program)** | `adadrp/stage2_program.py` | `fusion_training_program(...)` |
 
 **关键说明**：`ProgramFusionMLP.forward` 返回值与原始 `Fusion_MLP.forward` **完全兼容**：
 ```python
@@ -223,7 +223,7 @@ drug_feat, _ = self.drug_mlp(drug_feat)  # [D, 64]
 | **Top-K Positive Pair 选择** | `finetune.py` | `get_gene_feat_sim(...)` + `get_featuers(...)` | ✅ 直接复用 |
 | **Negative Pair 构造** | `finetune.py` | `all_target_fusion_feat.reshape(-1, D)` | ✅ 直接复用 |
 | **Contrastive Loss** | `myloss.py` | `contrastive_loss(...)` | ✅ 直接复用 |
-| **Stage 3 训练函数** | `mmpa_drp/stage2_program.py` | `fusion_training_program` 中的 contrastive loop | ✅ 已接入 |
+| **Stage 3 训练函数** | `adadrp/stage2_program.py` | `fusion_training_program` 中的 contrastive loop | ✅ 已接入 |
 
 **Phase 2 未改动**：本阶段仍使用 `sample-level` contrastive（基于 `h_pool` 的 cosine similarity 选 Top-K），**尚未替换为 tissue-program prototype alignment**。
 
@@ -237,7 +237,7 @@ drug_feat, _ = self.drug_mlp(drug_feat)  # [D, 64]
 | `testing.py` | `multi_eval_epoch(...)` | 计算 AUC, AUPR, ACC, F1 |
 | `finetune.py` | `fusion_eval_epoch(...)` | Validation 评估（GDSC/CCLE 验证集） |
 
-MMPA 结果额外保存至：`outputs/mmpa_step2_results.csv`
+AdaDRP 结果额外保存至：`outputs/adadrp_step2_results.csv`
 
 ---
 
@@ -257,7 +257,7 @@ MMPA 结果额外保存至：`outputs/mmpa_step2_results.csv`
 |---|------|------|
 | 1 | 梳理 MACB-DRP 三阶段代码结构 | ✅ |
 | 2 | 记录 Stage 1/2/3 对应文件、函数、张量 shape | ✅ |
-| 3 | 建立 `mmpa_drp/` 扩展包结构 | ✅ |
+| 3 | 建立 `adadrp/` 扩展包结构 | ✅ |
 | 4 | 实现 `MolecularProgramEncoder`（Phase 1 骨架） | ✅ |
 | 5 | 实现 `DrugMechanismGate`（Phase 1 骨架） | ✅ |
 | 6 | 实现 `DrugGatedProgramAggregator`（Phase 1 骨架） | ✅ |
@@ -269,24 +269,24 @@ MMPA 结果额外保存至：`outputs/mmpa_step2_results.csv`
 
 | # | 任务 | 状态 | 文件 |
 |---|------|------|------|
-| 1 | `MolecularProgramEncoder` 输出改为 dict `{"z", "q", "h"}`，其中 `h = sum_k q_k * z_k` | ✅ | `mmpa_drp/models.py` |
-| 2 | 实现 `ProgramTissueClassifier`（Stage 1 drop-in replacement） | ✅ | `mmpa_drp/models.py` |
-| 3 | 实现 `ProgramFusionMLP`（Stage 2/3 drop-in replacement） | ✅ | `mmpa_drp/models.py` |
-| 4 | 实现 Program auxiliary losses（diversity, sparsity, reconstruction placeholder） | ✅ | `mmpa_drp/losses.py` |
-| 5 | 实现 `train_tissue_classifier_program`（Stage 1 训练，含 auxiliary losses） | ✅ | `mmpa_drp/stage1_program.py` |
-| 6 | 实现 `save_feat_program`（适配 ProgramTissueClassifier） | ✅ | `mmpa_drp/stage1_program.py` |
-| 7 | 实现 `fusion_training_program`（Stage 2&3 训练，使用 ProgramFusionMLP） | ✅ | `mmpa_drp/stage2_program.py` |
-| 8 | 新增 `train_mmpa_program.py` 主入口 | ✅ | `train_mmpa_program.py` |
+| 1 | `MolecularProgramEncoder` 输出改为 dict `{"z", "q", "h"}`，其中 `h = sum_k q_k * z_k` | ✅ | `adadrp/models.py` |
+| 2 | 实现 `ProgramTissueClassifier`（Stage 1 drop-in replacement） | ✅ | `adadrp/models.py` |
+| 3 | 实现 `ProgramFusionMLP`（Stage 2/3 drop-in replacement） | ✅ | `adadrp/models.py` |
+| 4 | 实现 Program auxiliary losses（diversity, sparsity, reconstruction placeholder） | ✅ | `adadrp/losses.py` |
+| 5 | 实现 `train_tissue_classifier_program`（Stage 1 训练，含 auxiliary losses） | ✅ | `adadrp/stage1_program.py` |
+| 6 | 实现 `save_feat_program`（适配 ProgramTissueClassifier） | ✅ | `adadrp/stage1_program.py` |
+| 7 | 实现 `fusion_training_program`（Stage 2&3 训练，使用 ProgramFusionMLP） | ✅ | `adadrp/stage2_program.py` |
+| 8 | 新增 `train_adadrp_program.py` 主入口 | ✅ | `train_adadrp_program.py` |
 | 9 | 原始 MACB-DRP 文件未修改 | ✅ | 全部原始文件时间戳未变 |
-| 10 | `ProgramFusionMLP` 使用延迟导入避免 rdkit 依赖链 | ✅ | `mmpa_drp/models.py` |
+| 10 | `ProgramFusionMLP` 使用延迟导入避免 rdkit 依赖链 | ✅ | `adadrp/models.py` |
 
 ### ✅ Phase 2 （现已完成）
 
 | # | 任务 | 状态 | 说明 |
 |---|------|------|------|
-| 1 | 运行 `test_mmpa_modules.py` smoke test 验证 forward/backward | ✅ 已通过 | 在 `macb-drp` conda 环境（torch+rdkit）和 base 环境（仅 torch）均验证通过；通过 mock 断开了 rdkit/sklearn/matplotlib 导入链 |
-| 2 | 端到端训练验证（Stage 1 → Stage 2 → Stage 3 → Evaluation） | ✅ 已通过 | 使用 `train_mmpa_program.py` 快速验证（pretrain/train/contrastive 各 1 epoch），5-fold CV 完整跑通，无报错 |
-| 3 | 输出 `outputs/mmpa_step2_results.csv` 并确认指标正常 | ✅ 已生成 | 文件已生成，包含 9 种药物的 auc/aupr/f1/acc 指标；各 fold 结果保存在 `results/fold-{0..4}/` 中 |
+| 1 | 运行 `test_adadrp_modules.py` smoke test 验证 forward/backward | ✅ 已通过 | 在 `macb-drp` conda 环境（torch+rdkit）和 base 环境（仅 torch）均验证通过；通过 mock 断开了 rdkit/sklearn/matplotlib 导入链 |
+| 2 | 端到端训练验证（Stage 1 → Stage 2 → Stage 3 → Evaluation） | ✅ 已通过 | 使用 `train_adadrp_program.py` 快速验证（pretrain/train/contrastive 各 1 epoch），5-fold CV 完整跑通，无报错 |
+| 3 | 输出 `outputs/adadrp_step2_results.csv` 并确认指标正常 | ✅ 已生成 | 文件已生成，包含 9 种药物的 auc/aupr/f1/acc 指标；各 fold 结果保存在 `results/fold-{0..4}/` 中 |
 
 ---
 
@@ -315,18 +315,18 @@ MMPA 结果额外保存至：`outputs/mmpa_step2_results.csv`
 - **改造点**：
   - 在 `ProgramFusionMLP` 中新增 `DrugMechanismGate`
   - 将 `bilinear` 的输入从 `gene_feat_expand` 改为 `v.reshape(-1, d)`
-- **状态**：`DrugMechanismGate` 和 `DrugGatedProgramAggregator` 已在 `mmpa_drp/models.py` 中实现，但未接入训练
+- **状态**：`DrugMechanismGate` 和 `DrugGatedProgramAggregator` 已在 `adadrp/models.py` 中实现，但未接入训练
 
 ### Step 4: 替换 Sample-level Contrastive 为 Tissue-Program Prototype Alignment
 - **目标**：放弃基于 `h_pool` cosine similarity 的 sample-level Top-K 对比
 - **新机制**：
   - 按 tissue type 聚合 source/target 的 program tokens `z`，得到 tissue-program prototypes `[C, K, d]`
   - 使用 `ProgramPrototypeAlignmentLoss` 做跨 domain prototype alignment
-- **状态**：接口已在 `mmpa_drp/losses.py` 中定义，但核心逻辑仍是 TODO
+- **状态**：接口已在 `adadrp/losses.py` 中定义，但核心逻辑仍是 TODO
 
 ### Step 5: 加入 Drug-Gated Program Contrastive Separation
 - **目标**：在 prototype alignment 基础上，加入 drug gate 加权的 program-level contrastive separation
-- **状态**：接口已在 `mmpa_drp/losses.py` 中定义，但核心逻辑仍是 TODO
+- **状态**：接口已在 `adadrp/losses.py` 中定义，但核心逻辑仍是 TODO
 
 ---
 
@@ -338,7 +338,7 @@ MMPA 结果额外保存至：`outputs/mmpa_step2_results.csv`
 
 ### 13.1 汇总表（9 种药物平均）
 
-| 指标 | MACB-DRP | MMPA w/o aux | MMPA + aux | 提升 (vs MACB) |
+| 指标 | MACB-DRP | AdaDRP w/o aux | AdaDRP + aux | 提升 (vs MACB) |
 |------|----------|--------------|------------|----------------|
 | **AUC** | 0.4970 | 0.5292 | **0.5763** | **+15.9%** |
 | **AUPR** | 0.6657 | 0.6874 | **0.7098** | **+6.6%** |
@@ -347,12 +347,12 @@ MMPA 结果额外保存至：`outputs/mmpa_step2_results.csv`
 
 ### 13.2 关键发现
 
-1. **MMPA w/o aux > MACB-DRP**：仅将基因编码器替换为 `MolecularProgramEncoder`（`num_programs=8`，即 8 个 program tokens），不使用任何辅助损失，就在全部四项指标上超越了原始模型。说明**程序 token 的解构表示本身**就具有优势。
-2. **MMPA + aux > MMPA w/o aux**：加入 `diversity loss` + `sparsity loss` 后，AUC 从 0.5292 进一步提升到 0.5763（+8.9%），AUPR/F1/ACC 也全面上涨。说明**辅助损失能有效引导 program tokens 学到更有结构、更稀疏的表征**。
+1. **AdaDRP w/o aux > MACB-DRP**：仅将基因编码器替换为 `MolecularProgramEncoder`（`num_programs=8`，即 8 个 program tokens），不使用任何辅助损失，就在全部四项指标上超越了原始模型。说明**程序 token 的解构表示本身**就具有优势。
+2. **AdaDRP + aux > AdaDRP w/o aux**：加入 `diversity loss` + `sparsity loss` 后，AUC 从 0.5292 进一步提升到 0.5763（+8.9%），AUPR/F1/ACC 也全面上涨。说明**辅助损失能有效引导 program tokens 学到更有结构、更稀疏的表征**。
 
-### 13.3 各药物 AUC 对比（MMPA + aux vs MACB-DRP）
+### 13.3 各药物 AUC 对比（AdaDRP + aux vs MACB-DRP）
 
-| 药物 | MACB-DRP | MMPA + aux | 变化 |
+| 药物 | MACB-DRP | AdaDRP + aux | 变化 |
 |------|----------|------------|------|
 | 5-Fluorouracil | 0.5394 | 0.5777 | +7.1% |
 | Cisplatin | 0.6434 | 0.6083 | -5.5% |
@@ -364,16 +364,16 @@ MMPA 结果额外保存至：`outputs/mmpa_step2_results.csv`
 | Paclitaxel | 0.4273 | 0.4657 | +9.0% |
 | Temozolomide | 0.4858 | **0.6884** | **+41.7%** |
 
-> **注**：Cisplatin 是唯一 MMPA + aux 略低于 MACB-DRP 的药物（-5.5%），其余 8 种药物全部提升。Cyclophosphamide、Doxorubicin、Temozolomide 提升最为显著（>40%）。
+> **注**：Cisplatin 是唯一 AdaDRP + aux 略低于 MACB-DRP 的药物（-5.5%），其余 8 种药物全部提升。Cyclophosphamide、Doxorubicin、Temozolomide 提升最为显著（>40%）。
 
 ### 13.4 输出文件
 
 | 文件 | 说明 |
 |------|------|
-| `outputs/mmpa_step2_ablation.csv` | 三模型 mean 指标对比 |
-| `outputs/mmpa_step2_ablation_full.csv` | 每药物完整四项指标 |
-| `results/..._mmpa_noaux.csv` | MMPA w/o aux 5-fold 平均 |
-| `results/..._mmpa_aux.csv` | MMPA + aux 5-fold 平均 |
+| `outputs/adadrp_step2_ablation.csv` | 三模型 mean 指标对比 |
+| `outputs/adadrp_step2_ablation_full.csv` | 每药物完整四项指标 |
+| `results/..._adadrp_noaux.csv` | AdaDRP w/o aux 5-fold 平均 |
+| `results/..._adadrp_aux.csv` | AdaDRP + aux 5-fold 平均 |
 
 ---
 
@@ -386,7 +386,7 @@ MMPA 结果额外保存至：`outputs/mmpa_step2_results.csv`
 
 | 实验 | 配置 |
 |------|------|
-| **A** | Phase 2 baseline (MMPA + aux) |
+| **A** | Phase 2 baseline (AdaDRP + aux) |
 | **B** | + disentangle branches only (λ_adv=0, λ_nuisance=0, λ_ortho=0) |
 | **C** | + branches + adversarial response (λ_adv=0.005) |
 | **D** | + branches + adv + domain nuisance (λ_adv=0.005, λ_nuisance=0.005) |
@@ -421,16 +421,16 @@ MMPA 结果额外保存至：`outputs/mmpa_step2_results.csv`
 
 | 模块 | 文件 | 说明 |
 |------|------|------|
-| `DisentangledProgramEncoder` (residual 版) | `mmpa_drp/models.py` | 支持 `residual_mode`: fixed / learnable_scalar / learnable_vector |
-| `BinaryDomainDiscriminator` | `mmpa_drp/models.py` | 二分类 domain discriminator |
-| `DisentangledProgramTissueClassifier` | `mmpa_drp/models.py` | Stage 1 使用 `h_pred` 做分类 |
-| `DisentangledProgramFusionMLP` | `mmpa_drp/models.py` | Stage 2/3 使用 `h_pred` 做 bilinear fusion |
-| `orthogonality_loss` | `mmpa_drp/losses.py` | DCDNet DiffLoss 风格的正交约束 |
-| `response_domain_adversarial_loss` | `mmpa_drp/losses.py` | GRL + domain discriminator on h_response |
-| `domain_nuisance_loss` | `mmpa_drp/losses.py` | 正常 domain classification on h_domain |
-| `train_tissue_classifier_disentangle` | `mmpa_drp/stage1_disentangle.py` | Stage 1 训练，支持 freeze warm-up + distill |
-| `fusion_training_disentangle` | `mmpa_drp/stage2_disentangle.py` | Stage 2/3 训练 |
-| `train_mmpa_disentangle.py` | 根目录 | Phase 3A 主入口 |
+| `DisentangledProgramEncoder` (residual 版) | `adadrp/models.py` | 支持 `residual_mode`: fixed / learnable_scalar / learnable_vector |
+| `BinaryDomainDiscriminator` | `adadrp/models.py` | 二分类 domain discriminator |
+| `DisentangledProgramTissueClassifier` | `adadrp/models.py` | Stage 1 使用 `h_pred` 做分类 |
+| `DisentangledProgramFusionMLP` | `adadrp/models.py` | Stage 2/3 使用 `h_pred` 做 bilinear fusion |
+| `orthogonality_loss` | `adadrp/losses.py` | DCDNet DiffLoss 风格的正交约束 |
+| `response_domain_adversarial_loss` | `adadrp/losses.py` | GRL + domain discriminator on h_response |
+| `domain_nuisance_loss` | `adadrp/losses.py` | 正常 domain classification on h_domain |
+| `train_tissue_classifier_disentangle` | `adadrp/stage1_disentangle.py` | Stage 1 训练，支持 freeze warm-up + distill |
+| `fusion_training_disentangle` | `adadrp/stage2_disentangle.py` | Stage 2/3 训练 |
+| `train_adadrp_disentangle.py` | 根目录 | Phase 3A 主入口 |
 | `run_ablation_step3a.py` | 根目录 | Phase 3A 消融脚本 (A–E) |
 | `run_ablation_step3a_residual.py` | 根目录 | Phase 3A-R 消融脚本 (A, E, R1–R5) |
 | `extract_teacher_encoder.py` | 根目录 | 从 Phase 2 fusion model 提取 teacher encoder |
@@ -490,7 +490,7 @@ h_pred = h_base + alpha * h_response
 
 - **已停止**。Residual-Preserving Disentanglement **部分有效**但**未超越 Phase 2**（最佳 R5 AUC 0.5533 < baseline 0.5763）。
 - 解耦架构的根本限制可能需要更强的 alignment 机制来修复。
-- 相关消融脚本和模型代码保留在 `mmpa_drp/` 中作为历史记录，但不再继续迭代。
+- 相关消融脚本和模型代码保留在 `adadrp/` 中作为历史记录，但不再继续迭代。
 
 ---
 
@@ -513,9 +513,9 @@ h_pred = h_base + alpha * h_response
 | Orthogonality loss | `train.py` | `DiffLoss` (line 232) | 两个 feature map → scalar |
 | Contrastive loss | `train.py` | `PrivateContraLoss` (line 251) | feature, class label → scalar |
 
-### 16.2 可迁移到 MMPA-DRP 的思想
+### 16.2 可迁移到 AdaDRP 的思想
 
-| DCDNet 概念 | MMPA-DRP 适配 |
+| DCDNet 概念 | AdaDRP 适配 |
 |-------------|---------------|
 | base feature | `z_base` / `h_base` |
 | private feature | `z_response` / `h_response` (response-relevant) |
@@ -528,9 +528,9 @@ h_pred = h_base + alpha * h_response
 
 ### 16.3 不可直接迁移的部分
 
-- **Pixel-level CE Loss**：DCDNet 是分割任务，MMPA-DRP 是 DRP 预测
+- **Pixel-level CE Loss**：DCDNet 是分割任务，AdaDRP 是 DRP 预测
 - **H×W 空间依赖**：`Conv2d`、`Dropout2d`、`MaxPool2d` 需改为 `Linear`
-- **Few-shot support/query 结构**：MMPA-DRP 是标准监督/域适应，无 support/query
+- **Few-shot support/query 结构**：AdaDRP 是标准监督/域适应，无 support/query
 - **Real/Fake Discriminator**：过于复杂，建议简化为 binary domain discriminator
 
 ---
@@ -544,7 +544,7 @@ h_pred = h_base + alpha * h_response
 
 | 实验 | 配置 |
 |------|------|
-| **A** | Phase 2 baseline (MMPA + aux, use_drug_gate=False) |
+| **A** | Phase 2 baseline (AdaDRP + aux, use_drug_gate=False) |
 | **B** | + shared drug gate (所有药物共享同一个 gate) |
 | **C** | + drug-specific gate (每个药物有自己的 gate) |
 | **D** | + drug-specific gate + gate entropy reg (λ=0.1, minimize) |
@@ -575,8 +575,8 @@ h_pred = h_base + alpha * h_response
 
 | 文件 | 说明 |
 |------|------|
-| `outputs/mmpa_step3b_results.csv` | A–D 四组实验 mean 指标对比 |
-| `outputs/mmpa_step3b_per_drug.csv` | 每药物完整四项指标 |
+| `outputs/adadrp_step3b_results.csv` | A–D 四组实验 mean 指标对比 |
+| `outputs/adadrp_step3b_per_drug.csv` | 每药物完整四项指标 |
 | `outputs/drug_gate_step3b.csv` | Exp D 每药物 gate 权重 |
 | `outputs/drug_gate_entropy.csv` | 每药物 gate entropy |
 | `outputs/drug_gate_cosine.csv` | 药物间 gate cosine similarity |
@@ -631,7 +631,7 @@ h_pred = h_base + alpha * h_response
 
 **主版本（生产配置）：OT1**
 ```bash
-python train_mmpa_program.py \
+python train_adadrp_program.py \
   --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5 \
   --alph 0.3 --beta 0.3 --train \
   --num_programs 8 --program_dim 64 \
@@ -654,9 +654,9 @@ python train_mmpa_program.py \
 
 | 文件 | 说明 |
 |------|------|
-| `outputs/mmpa_ot_results.csv` | 6 组实验 mean 指标对比 |
-| `outputs/mmpa_ot_per_drug.csv` | 每药物完整四项指标 |
-| `results/..._mmpa_ExpOT{1-5}.csv` | 各实验 5-fold 原始结果 |
+| `outputs/adadrp_ot_results.csv` | 6 组实验 mean 指标对比 |
+| `outputs/adadrp_ot_per_drug.csv` | 每药物完整四项指标 |
+| `results/..._adadrp_ExpOT{1-5}.csv` | 各实验 5-fold 原始结果 |
 
 ### 18.6 结论
 
@@ -675,12 +675,12 @@ python train_mmpa_program.py \
 
 | 模块 | 文件 | 说明 |
 |------|------|------|
-| `GRN1DVector` | `mmpa_drp/backbones.py` | ConvNeXt V2 GRN for vector [B,C] |
-| `GRN1DToken` | `mmpa_drp/backbones.py` | ConvNeXt V2 GRN for tokens [B,L,C] |
-| `GRNMLPBackbone` | `mmpa_drp/backbones.py` | 2-layer MLP + GRN + LayerNorm + GELU |
-| `ConvNeXt1DBlock` | `mmpa_drp/backbones.py` | 1D depthwise conv + pointwise MLP + GRN |
-| `ConvNeXt1DBackbone` | `mmpa_drp/backbones.py` | learned tokenizer + ConvNeXt blocks + mean pool |
-| `compute_program_diagnostics` | `mmpa_drp/program_diagnostics.py` | q_entropy, pairwise_cosine, effective_active_programs 等 |
+| `GRN1DVector` | `adadrp/backbones.py` | ConvNeXt V2 GRN for vector [B,C] |
+| `GRN1DToken` | `adadrp/backbones.py` | ConvNeXt V2 GRN for tokens [B,L,C] |
+| `GRNMLPBackbone` | `adadrp/backbones.py` | 2-layer MLP + GRN + LayerNorm + GELU |
+| `ConvNeXt1DBlock` | `adadrp/backbones.py` | 1D depthwise conv + pointwise MLP + GRN |
+| `ConvNeXt1DBackbone` | `adadrp/backbones.py` | learned tokenizer + ConvNeXt blocks + mean pool |
+| `compute_program_diagnostics` | `adadrp/program_diagnostics.py` | q_entropy, pairwise_cosine, effective_active_programs 等 |
 
 `MolecularProgramEncoder` 新增 `backbone_type` 参数：
 - `"mlp"`: 原始 MLP (Phase 2 兼容)
@@ -689,14 +689,14 @@ python train_mmpa_program.py \
 
 ### 19.3 原始 MACB-DRP 基准
 
-为验证 MMPA 改进的有效性，重新运行原始 MACB-DRP（`main.py`，`ResNetTissueClassifier`，无 molecular program，无 OT）。
+为验证 AdaDRP 改进的有效性，重新运行原始 MACB-DRP（`main.py`，`ResNetTissueClassifier`，无 molecular program，无 OT）。
 
 | 方法 | AUC | AUPR | F1 | ACC |
 |------|-----|------|-----|-----|
 | **原始 MACB-DRP** | 0.5575 | 0.7013 | **0.5789** | **0.5772** |
-| MMPA C0 (Phase 2 baseline) | 0.5763 | 0.7098 | 0.5420 | 0.5108 |
+| AdaDRP C0 (Phase 2 baseline) | 0.5763 | 0.7098 | 0.5420 | 0.5108 |
 
-**结论**：MMPA 本身（C0）相对原始 MACB-DRP，AUC 提升 **+1.88%**（0.5575 → 0.5763），AUPR 提升 +0.85%，但 F1/ACC 略有下降。说明 molecular program 的引入改善了排序能力（AUC/AUPR），但对硬分类阈值（F1/ACC）影响较小。
+**结论**：AdaDRP 本身（C0）相对原始 MACB-DRP，AUC 提升 **+1.88%**（0.5575 → 0.5763），AUPR 提升 +0.85%，但 F1/ACC 略有下降。说明 molecular program 的引入改善了排序能力（AUC/AUPR），但对硬分类阈值（F1/ACC）影响较小。
 原始：
 5-fold average/std results: 
 5-Fluorouracil    auc: 0.6038/0.0230 | aupr: 0.7128/0.0236 | f1: 0.5473/0.0335 | acc: 0.5766/0.0722
@@ -732,7 +732,7 @@ auc_aupr_metrics：0.6595/0.1409
 2. **C2 (GRN-MLP) 是风险最低的升级**：AUC 0.5903，比原始 MACB-DRP 提升 +3.28%，改动最小
 3. **ConvNeXt 深度不是越深越好**：depth=1 (0.5924) > depth=2 (0.5840)，说明 shallow ConvNeXt 更适合
 4. **大 kernel 有害**：kernel=15 导致 AUC 暴跌到 0.5499，比原始 MACB-DRP 还低
-5. **MMPA 对 F1/ACC 的影响**：所有 MMPA 变体的 F1 和 ACC 均低于原始 MACB-DRP，说明 molecular program + OT 优化的是排序能力，而非硬分类阈值
+5. **AdaDRP 对 F1/ACC 的影响**：所有 AdaDRP 变体的 F1 和 ACC 均低于原始 MACB-DRP，说明 molecular program + OT 优化的是排序能力，而非硬分类阈值
 
 ### 19.6 Per-Drug 详细对比 (AUC)
 
@@ -758,7 +758,7 @@ auc_aupr_metrics：0.6595/0.1409
 
 **推荐命令 (C3):**
 ```bash
-python train_mmpa_program.py \
+python train_adadrp_program.py \
   --use_ot_alignment --lambda_ot 0.01 --ot_reg 0.1 \
   --ot_cost_type cosine --ot_marginal_type uniform \
   --backbone_type convnext1d \
@@ -767,7 +767,7 @@ python train_mmpa_program.py \
 
 **稳健备选 (C2):**
 ```bash
-python train_mmpa_program.py \
+python train_adadrp_program.py \
   --use_ot_alignment --lambda_ot 0.01 --ot_reg 0.1 \
   --ot_cost_type cosine --ot_marginal_type uniform \
   --backbone_type grn_mlp --norm_type layernorm
@@ -777,9 +777,9 @@ python train_mmpa_program.py \
 
 | 文件 | 说明 |
 |------|------|
-| `outputs/mmpa_ot1_convnext_results.csv` | 6 组实验 mean 指标对比 |
-| `outputs/mmpa_ot1_convnext_per_drug.csv` | 每药物完整四项指标 |
-| `results/..._mmpa_ExpC{0-5}.csv` | 各实验 5-fold 原始结果 |
+| `outputs/adadrp_ot1_convnext_results.csv` | 6 组实验 mean 指标对比 |
+| `outputs/adadrp_ot1_convnext_per_drug.csv` | 每药物完整四项指标 |
+| `results/..._adadrp_ExpC{0-5}.csv` | 各实验 5-fold 原始结果 |
 
 ---
 
@@ -805,7 +805,7 @@ TransDRP 是论文 "Knowledge-guided domain adaptation model for transferring dr
 |------|-----|------|-----|-----|
 | **原始 MACB-DRP** | **0.5575** | **0.7013** | **0.5789** | **0.5772** |
 | **TransDRP** | 0.5440 | 0.6380 | 0.5023 | 0.4079 |
-| MMPA C0 (Phase 2) | 0.5763 | 0.7098 | 0.5420 | 0.5108 |
+| AdaDRP C0 (Phase 2) | 0.5763 | 0.7098 | 0.5420 | 0.5108 |
 | OT1 MLP (C1) | 0.5798 | 0.7092 | 0.5324 | 0.5101 |
 | GRN-MLP (C2) | 0.5903 | 0.7224 | 0.5444 | 0.4937 |
 | **ConvNeXt1D d=1 (C3)** | **0.5924** | **0.7281** | 0.5674 | 0.5324 |
@@ -814,7 +814,7 @@ TransDRP 是论文 "Knowledge-guided domain adaptation model for transferring dr
 
 | 维度 | TransDRP 表现 |
 |------|--------------|
-| **AUC** | 0.5440，**低于原始 MACB-DRP** (0.5575) 和所有 MMPA 变体 |
+| **AUC** | 0.5440，**低于原始 MACB-DRP** (0.5575) 和所有 AdaDRP 变体 |
 | **AUPR/F1/ACC** | **显著低于所有方法**。AUPR 比 MACB 低 6.33%，ACC 低 16.93% |
 | **优势药物** | 仅 **Temozolomide (0.7995)** 是所有方法中最高的；5-FU (0.5639) 也不错 |
 | **劣势药物** | Doxorubicin (0.3316)、Cyclophosphamide (0.5019)、Etoposide (0.5766) 表现较差 |
@@ -823,61 +823,61 @@ TransDRP 是论文 "Knowledge-guided domain adaptation model for transferring dr
 
 #### AUC
 
-| 药物 | MACB | TransDRP | MMPA C3 | 最佳 |
+| 药物 | MACB | TransDRP | AdaDRP C3 | 最佳 |
 |------|------|----------|---------|------|
-| 5-Fluorouracil | 0.5218 | 0.5639 | **0.6120** | MMPA C3 |
+| 5-Fluorouracil | 0.5218 | 0.5639 | **0.6120** | AdaDRP C3 |
 | Cisplatin | **0.6682** | 0.6484 | 0.6442 | MACB |
 | Cyclophosphamide | **0.6341** | 0.5019 | 0.6066 | MACB |
-| Docetaxel | 0.3739 | 0.4121 | **0.5269** | MMPA C3 |
-| Doxorubicin | 0.3976 | 0.3316 | **0.5221** | MMPA C3 |
+| Docetaxel | 0.3739 | 0.4121 | **0.5269** | AdaDRP C3 |
+| Doxorubicin | 0.3976 | 0.3316 | **0.5221** | AdaDRP C3 |
 | Etoposide | **0.7548** | 0.5766 | 0.6842 | MACB |
 | Gemcitabine | **0.5997** | 0.5982 | 0.5949 | MACB |
-| Paclitaxel | 0.4676 | 0.4639 | **0.4956** | MMPA C3 |
+| Paclitaxel | 0.4676 | 0.4639 | **0.4956** | AdaDRP C3 |
 | Temozolomide | 0.5998 | **0.7995** | 0.6452 | TransDRP |
-| **Mean** | **0.5575** | 0.5440 | **0.5924** | **MMPA C3** |
+| **Mean** | **0.5575** | 0.5440 | **0.5924** | **AdaDRP C3** |
 
 #### AUPR
 
-| 药物 | MACB | TransDRP | MMPA C3 | 最佳 |
+| 药物 | MACB | TransDRP | AdaDRP C3 | 最佳 |
 |------|------|----------|---------|------|
-| 5-Fluorouracil | 0.6715 | 0.6879 | **0.7149** | MMPA C3 |
+| 5-Fluorouracil | 0.6715 | 0.6879 | **0.7149** | AdaDRP C3 |
 | Cisplatin | **0.8211** | 0.6996 | 0.8080 | MACB |
 | Cyclophosphamide | **0.9371** | 0.8820 | 0.9346 | MACB |
-| Docetaxel | 0.6177 | 0.6157 | **0.7034** | MMPA C3 |
-| Doxorubicin | 0.6892 | 0.5064 | **0.7873** | MMPA C3 |
+| Docetaxel | 0.6177 | 0.6157 | **0.7034** | AdaDRP C3 |
+| Doxorubicin | 0.6892 | 0.5064 | **0.7873** | AdaDRP C3 |
 | Etoposide | **0.9117** | 0.6663 | 0.8855 | MACB |
-| Gemcitabine | 0.5834 | 0.4567 | **0.5858** | MMPA C3 |
-| Paclitaxel | 0.6878 | 0.5740 | **0.7053** | MMPA C3 |
+| Gemcitabine | 0.5834 | 0.4567 | **0.5858** | AdaDRP C3 |
+| Paclitaxel | 0.6878 | 0.5740 | **0.7053** | AdaDRP C3 |
 | Temozolomide | 0.3924 | **0.6532** | 0.4286 | TransDRP |
-| **Mean** | **0.7013** | 0.6380 | **0.7281** | **MMPA C3** |
+| **Mean** | **0.7013** | 0.6380 | **0.7281** | **AdaDRP C3** |
 
 #### F1
 
-| 药物 | MACB | TransDRP | MMPA C3 | 最佳 |
+| 药物 | MACB | TransDRP | AdaDRP C3 | 最佳 |
 |------|------|----------|---------|------|
-| 5-Fluorouracil | 0.5318 | 0.5227 | **0.5336** | MMPA C3 |
+| 5-Fluorouracil | 0.5318 | 0.5227 | **0.5336** | AdaDRP C3 |
 | Cisplatin | **0.7026** | 0.6158 | 0.5468 | MACB |
 | Cyclophosphamide | **0.6800** | 0.2235 | 0.6000 | MACB |
-| Docetaxel | 0.3887 | 0.4151 | **0.5069** | MMPA C3 |
-| Doxorubicin | 0.3208 | 0.3220 | **0.4830** | MMPA C3 |
+| Docetaxel | 0.3887 | 0.4151 | **0.5069** | AdaDRP C3 |
+| Doxorubicin | 0.3208 | 0.3220 | **0.4830** | AdaDRP C3 |
 | Etoposide | **0.8083** | 0.5583 | 0.6250 | MACB |
 | Gemcitabine | 0.5730 | **0.6130** | 0.5774 | TransDRP |
-| Paclitaxel | 0.4568 | 0.4459 | **0.5081** | MMPA C3 |
+| Paclitaxel | 0.4568 | 0.4459 | **0.5081** | AdaDRP C3 |
 | Temozolomide | 0.7478 | **0.8045** | 0.7254 | TransDRP |
 | **Mean** | **0.5789** | 0.5023 | 0.5674 | **MACB** |
 
 #### ACC
 
-| 药物 | MACB | TransDRP | MMPA C3 | 最佳 |
+| 药物 | MACB | TransDRP | AdaDRP C3 | 最佳 |
 |------|------|----------|---------|------|
 | 5-Fluorouracil | **0.6039** | 0.4892 | 0.5211 | MACB |
 | Cisplatin | **0.7988** | 0.6575 | 0.5861 | MACB |
 | Cyclophosphamide | **0.7934** | 0.2186 | 0.6967 | MACB |
-| Docetaxel | 0.4518 | 0.4332 | **0.5362** | MMPA C3 |
-| Doxorubicin | 0.3429 | 0.2257 | **0.5095** | MMPA C3 |
+| Docetaxel | 0.4518 | 0.4332 | **0.5362** | AdaDRP C3 |
+| Doxorubicin | 0.3429 | 0.2257 | **0.5095** | AdaDRP C3 |
 | Etoposide | **0.8818** | 0.5781 | 0.6966 | MACB |
 | Gemcitabine | **0.5508** | 0.4819 | 0.4926 | MACB |
-| Paclitaxel | 0.5244 | 0.3866 | **0.5752** | MMPA C3 |
+| Paclitaxel | 0.5244 | 0.3866 | **0.5752** | AdaDRP C3 |
 | Temozolomide | 0.2467 | **0.2003** | 0.1778 | MACB |
 | **Mean** | **0.5772** | 0.4079 | 0.5324 | **MACB** |
 
@@ -885,9 +885,9 @@ TransDRP 是论文 "Knowledge-guided domain adaptation model for transferring dr
 
 - **TransDRP 重新运行后 AUC 降至 0.5440，低于原始 MACB-DRP (0.5575)**
 - **原始 MACB-DRP 在 AUPR/F1/ACC 上全面优于 TransDRP**
-- **MMPA C3 全面超越 TransDRP**：AUC +4.84%，AUPR +9.02%，F1 +6.50%，ACC +12.45%
+- **AdaDRP C3 全面超越 TransDRP**：AUC +4.84%，AUPR +9.02%，F1 +6.50%，ACC +12.45%
 - TransDRP 的唯一亮点是 **Temozolomide (0.7995)**，是所有方法中最高的
-- **MMPA + ConvNeXt1D + OT 是当前最佳方案**
+- **AdaDRP + ConvNeXt1D + OT 是当前最佳方案**
 
 ---
 
@@ -895,17 +895,17 @@ TransDRP 是论文 "Knowledge-guided domain adaptation model for transferring dr
 
 | 文件 | 说明 | 状态 |
 |------|------|------|
-| `mmpa_drp/models.py` | `MolecularProgramEncoder`, `ProgramTissueClassifier`, `ProgramFusionMLP` | ✅ 活跃 |
-| `mmpa_drp/losses.py` | diversity, sparsity, entropy_floor, gate_balance, gate_diversity | ✅ 活跃 |
-| `mmpa_drp/ot_utils.py` | Sinkhorn, OT cost, OT alignment loss | ✅ 活跃（Phase OT） |
-| `mmpa_drp/stage1_program.py` | Stage 1 训练 | ✅ 活跃 |
-| `mmpa_drp/stage2_program.py` | Stage 2&3 训练（含 OT loss 集成） | ✅ 活跃 |
-| `train_mmpa_program.py` | MMPA-DRP 训练主入口 | ✅ 活跃 |
-| `test_mmpa_ot.py` | OT utility smoke test | ✅ 活跃 |
+| `adadrp/models.py` | `MolecularProgramEncoder`, `ProgramTissueClassifier`, `ProgramFusionMLP` | ✅ 活跃 |
+| `adadrp/losses.py` | diversity, sparsity, entropy_floor, gate_balance, gate_diversity | ✅ 活跃 |
+| `adadrp/ot_utils.py` | Sinkhorn, OT cost, OT alignment loss | ✅ 活跃（Phase OT） |
+| `adadrp/stage1_program.py` | Stage 1 训练 | ✅ 活跃 |
+| `adadrp/stage2_program.py` | Stage 2&3 训练（含 OT loss 集成） | ✅ 活跃 |
+| `train_adadrp_program.py` | AdaDRP 训练主入口 | ✅ 活跃 |
+| `test_adadrp_ot.py` | OT utility smoke test | ✅ 活跃 |
 | `CODEMAP_MACB.md` | 本文件 | ✅ 活跃 |
-| `CODEMAP_OT_TRANSFER_TO_MMPA.md` | OT 迁移设计文档 | ✅ 参考 |
+| `CODEMAP_OT_TRANSFER_TO_AdaDRP.md` | OT 迁移设计文档 | ✅ 参考 |
 
-### 已停止的模块（代码保留在 `mmpa_drp/` 中作为历史记录，脚本已清理）
+### 已停止的模块（代码保留在 `adadrp/` 中作为历史记录，脚本已清理）
 
 | 模块 | 停止原因 |
 |------|----------|
@@ -930,7 +930,7 @@ L_total = L_response + L_cdan + L_aux + lambda_sample_ot * L_sample_OT + lambda_
 
 ### 21.2 实现组件
 
-#### `ProgramOTLoss` (`mmpa_drp/ot_utils.py`)
+#### `ProgramOTLoss` (`adadrp/ot_utils.py`)
 
 ```python
 class ProgramOTLoss(nn.Module):
@@ -948,7 +948,7 @@ class ProgramOTLoss(nn.Module):
 - `sinkhorn_log_domain` batch 求解 K 个 transport plan
 - `ot_dist = sum(T * cost) / K`
 
-#### `ProgramFusionMLP.forward` (`mmpa_drp/models.py`)
+#### `ProgramFusionMLP.forward` (`adadrp/models.py`)
 
 新增可选参数 `return_encoder_out=False`：
 - 当 `True` 时，额外返回 `encoder_out` dict（含 `z`, `q`, `h`）
@@ -967,7 +967,7 @@ class ProgramOTLoss(nn.Module):
 - 实例化 `ProgramOTLoss`
 - `"program_only"` 模式下自动禁用样本级 OT（`ot_loss_module = None`）
 
-#### `train_mmpa_program.py` 参数
+#### `train_adadrp_program.py` 参数
 
 新增 CLI 参数：
 ```bash
@@ -1014,19 +1014,19 @@ class ProgramOTLoss(nn.Module):
 
 | 文件 | 说明 | 状态 |
 |------|------|------|
-| `mmpa_drp/models.py` | `MolecularProgramEncoder`, `ProgramTissueClassifier`, `ProgramFusionMLP` | ✅ 活跃 |
-| `mmpa_drp/backbones.py` | `ConvNeXt1DBackbone`, `GRNMLPBackbone` | ✅ 活跃 (Phase 5) |
-| `mmpa_drp/losses.py` | diversity, sparsity, entropy_floor, gate_balance, gate_diversity | ✅ 活跃 |
-| `mmpa_drp/ot_utils.py` | `Sinkhorn`, `OT alignment`, `DrugAdaptiveOTLoss`, `ProgramOTLoss` | ✅ 活跃 (Phase 6) |
-| `mmpa_drp/stage1_program.py` | Stage 1 训练 | ✅ 活跃 |
-| `mmpa_drp/stage2_program.py` | Stage 2&3 训练（含 OT + Program OT） | ✅ 活跃 |
-| `mmpa_drp/program_diagnostics.py` | Program 诊断计算 | ✅ 活跃 |
-| `train_mmpa_program.py` | MMPA-DRP 训练主入口 | ✅ 活跃 |
+| `adadrp/models.py` | `MolecularProgramEncoder`, `ProgramTissueClassifier`, `ProgramFusionMLP` | ✅ 活跃 |
+| `adadrp/backbones.py` | `ConvNeXt1DBackbone`, `GRNMLPBackbone` | ✅ 活跃 (Phase 5) |
+| `adadrp/losses.py` | diversity, sparsity, entropy_floor, gate_balance, gate_diversity | ✅ 活跃 |
+| `adadrp/ot_utils.py` | `Sinkhorn`, `OT alignment`, `DrugAdaptiveOTLoss`, `ProgramOTLoss` | ✅ 活跃 (Phase 6) |
+| `adadrp/stage1_program.py` | Stage 1 训练 | ✅ 活跃 |
+| `adadrp/stage2_program.py` | Stage 2&3 训练（含 OT + Program OT） | ✅ 活跃 |
+| `adadrp/program_diagnostics.py` | Program 诊断计算 | ✅ 活跃 |
+| `train_adadrp_program.py` | AdaDRP 训练主入口 | ✅ 活跃 |
 | `tests/test_program_ot.py` | Phase 6 smoke tests | ✅ 活跃 |
 | `tests/test_convnext_program_encoder.py` | Phase 5 smoke tests | ✅ 活跃 |
 | `CODEMAP_MACB.md` | 本文件 | ✅ 活跃 |
 
-### 已停止的模块（代码保留在 `mmpa_drp/` 中作为历史记录）
+### 已停止的模块（代码保留在 `adadrp/` 中作为历史记录）
 
 | 模块 | 停止原因 |
 |------|----------|
@@ -1045,7 +1045,7 @@ Phase 6 (POT1-POT5) 中，所有 program OT 实验结果与 C3 baseline **完全
 
 #### Task 1: 梯度诊断
 
-实现 `mmpa_drp/grad_diagnostics.py`，直接调用 `_fusion_model_train_step_with_ot` 检查梯度：
+实现 `adadrp/grad_diagnostics.py`，直接调用 `_fusion_model_train_step_with_ot` 检查梯度：
 
 | 检查项 | 结果 |
 |:---|:---|
@@ -1126,10 +1126,10 @@ Python `and` 短路救了它：`program_ot_loss_module is None` → 条件 False
 
 | 文件 | 改动 | 状态 |
 |:---|:---|:---|
-| `mmpa_drp/ot_utils.py` | 新增 `q_mass_flattened` 模式、`q_align_loss`、增强 diagnostics | ✅ |
-| `mmpa_drp/grad_diagnostics.py` | **新增**：梯度诊断工具 | ✅ |
-| `mmpa_drp/stage2_program.py` | **修复 bug** + 集成 q_align + 诊断日志 | ✅ |
-| `train_mmpa_program.py` | 新增 CLI 参数 + 防文件名碰撞 | ✅ |
+| `adadrp/ot_utils.py` | 新增 `q_mass_flattened` 模式、`q_align_loss`、增强 diagnostics | ✅ |
+| `adadrp/grad_diagnostics.py` | **新增**：梯度诊断工具 | ✅ |
+| `adadrp/stage2_program.py` | **修复 bug** + 集成 q_align + 诊断日志 | ✅ |
+| `train_adadrp_program.py` | 新增 CLI 参数 + 防文件名碰撞 | ✅ |
 | `tests/test_program_ot_repair.py` | **新增**：Phase 6-R smoke tests | ✅ |
 | `run_phase6r_repair.py` | **新增**：实验运行脚本 | ✅ |
 
@@ -1139,14 +1139,14 @@ Python `and` 短路救了它：`program_ot_loss_module is None` → 条件 False
 
 | 文件 | 说明 | 状态 |
 |------|------|------|
-| `mmpa_drp/models.py` | `MolecularProgramEncoder`, `ProgramTissueClassifier`, `ProgramFusionMLP` | ✅ 活跃 |
-| `mmpa_drp/backbones.py` | `ConvNeXt1DBackbone`, `GRNMLPBackbone` | ✅ 活跃 (Phase 5) |
-| `mmpa_drp/losses.py` | diversity, sparsity, entropy_floor, gate_balance, gate_diversity | ✅ 活跃 |
-| `mmpa_drp/ot_utils.py` | Sinkhorn, OT alignment, `ProgramOTLoss` (含 q_mass_flattened) | ✅ 活跃 (Phase 6-R) |
-| `mmpa_drp/grad_diagnostics.py` | 梯度诊断工具 | ✅ 活跃 (Phase 6-R) |
-| `mmpa_drp/stage1_program.py` | Stage 1 训练 | ✅ 活跃 |
-| `mmpa_drp/stage2_program.py` | Stage 2&3 训练（含 OT + Program OT + q_align） | ✅ 活跃 |
-| `train_mmpa_program.py` | MMPA-DRP 训练主入口 | ✅ 活跃 |
+| `adadrp/models.py` | `MolecularProgramEncoder`, `ProgramTissueClassifier`, `ProgramFusionMLP` | ✅ 活跃 |
+| `adadrp/backbones.py` | `ConvNeXt1DBackbone`, `GRNMLPBackbone` | ✅ 活跃 (Phase 5) |
+| `adadrp/losses.py` | diversity, sparsity, entropy_floor, gate_balance, gate_diversity | ✅ 活跃 |
+| `adadrp/ot_utils.py` | Sinkhorn, OT alignment, `ProgramOTLoss` (含 q_mass_flattened) | ✅ 活跃 (Phase 6-R) |
+| `adadrp/grad_diagnostics.py` | 梯度诊断工具 | ✅ 活跃 (Phase 6-R) |
+| `adadrp/stage1_program.py` | Stage 1 训练 | ✅ 活跃 |
+| `adadrp/stage2_program.py` | Stage 2&3 训练（含 OT + Program OT + q_align） | ✅ 活跃 |
+| `train_adadrp_program.py` | AdaDRP 训练主入口 | ✅ 活跃 |
 | `tests/test_program_ot_repair.py` | Phase 6-R smoke tests | ✅ 活跃 |
 | `CODEMAP_MACB.md` | 本文件 | ✅ 活跃 |
 
@@ -1205,7 +1205,7 @@ Python `and` 短路救了它：`program_ot_loss_module is None` → 条件 False
 2. **λ_ot=0.005 也有提升**：AUC 0.6139 (+3.63%)，说明当前 0.01 的 OT 权重可能略强，适度降低更有利。
 3. **组合效果：K=3 主导**：Combo (0.6189) vs K=3 单独 (0.6178)，增益仅 +0.0011。说明 K=3 已覆盖大部分 λ_ot 的增益。
 4. **K=5/K=9 均劣于 baseline**：K 增大反而降低性能，说明过多近邻引入了噪声。
-5. **alpha/beta 完全无效**：0.1/0.3/0.5 结果完全相同到小数点后4位。根因分析：这些参数在 `train_mmpa_program.py` 中存入 `training_params`，但 `stage2_program.py` 的训练函数未接收它们，而是使用 kwargs 默认值（α=0.3, β=0.3）。参数传递链断裂。
+5. **alpha/beta 完全无效**：0.1/0.3/0.5 结果完全相同到小数点后4位。根因分析：这些参数在 `train_adadrp_program.py` 中存入 `training_params`，但 `stage2_program.py` 的训练函数未接收它们，而是使用 kwargs 默认值（α=0.3, β=0.3）。参数传递链断裂。
 6. **组合配置全面超越所有先前方法**：
    - vs 原始 MACB-DRP: +6.17% (0.5575 → 0.6189)
    - vs TransDRP: +7.41% (0.5440 → 0.6189)
@@ -1240,7 +1240,7 @@ Python `and` 短路救了它：`program_ot_loss_module is None` → 条件 False
 | 文件 | 改动 | 状态 |
 |:---|:---|:---|
 | `run_c3_tuning.py` | **新增**：C3 超参调优脚本 | ✅ |
-| `mmpa_drp/stage2_program.py` | 修复 alpha/beta 参数传递（部分修复，仍待确认） | ⚠️ |
+| `adadrp/stage2_program.py` | 修复 alpha/beta 参数传递（部分修复，仍待确认） | ⚠️ |
 
 ---
 
@@ -1248,14 +1248,14 @@ Python `and` 短路救了它：`program_ot_loss_module is None` → 条件 False
 
 | 文件 | 说明 | 状态 |
 |------|------|------|
-| `mmpa_drp/models.py` | `MolecularProgramEncoder`, `ProgramTissueClassifier`, `ProgramFusionMLP` | ✅ 活跃 |
-| `mmpa_drp/backbones.py` | `ConvNeXt1DBackbone`, `GRNMLPBackbone` | ✅ 活跃 (Phase 5) |
-| `mmpa_drp/losses.py` | diversity, sparsity, entropy_floor, gate_balance, gate_diversity | ✅ 活跃 |
-| `mmpa_drp/ot_utils.py` | Sinkhorn, OT alignment, `ProgramOTLoss` (含 q_mass_flattened) | ✅ 活跃 (Phase 6-R) |
-| `mmpa_drp/grad_diagnostics.py` | 梯度诊断工具 | ✅ 活跃 (Phase 6-R) |
-| `mmpa_drp/stage1_program.py` | Stage 1 训练 | ✅ 活跃 |
-| `mmpa_drp/stage2_program.py` | Stage 2&3 训练（含 OT + Program OT + q_align） | ✅ 活跃 |
-| `train_mmpa_program.py` | MMPA-DRP 训练主入口 | ✅ 活跃 |
+| `adadrp/models.py` | `MolecularProgramEncoder`, `ProgramTissueClassifier`, `ProgramFusionMLP` | ✅ 活跃 |
+| `adadrp/backbones.py` | `ConvNeXt1DBackbone`, `GRNMLPBackbone` | ✅ 活跃 (Phase 5) |
+| `adadrp/losses.py` | diversity, sparsity, entropy_floor, gate_balance, gate_diversity | ✅ 活跃 |
+| `adadrp/ot_utils.py` | Sinkhorn, OT alignment, `ProgramOTLoss` (含 q_mass_flattened) | ✅ 活跃 (Phase 6-R) |
+| `adadrp/grad_diagnostics.py` | 梯度诊断工具 | ✅ 活跃 (Phase 6-R) |
+| `adadrp/stage1_program.py` | Stage 1 训练 | ✅ 活跃 |
+| `adadrp/stage2_program.py` | Stage 2&3 训练（含 OT + Program OT + q_align） | ✅ 活跃 |
+| `train_adadrp_program.py` | AdaDRP 训练主入口 | ✅ 活跃 |
 | `tests/test_program_ot_repair.py` | Phase 6-R smoke tests | ✅ 活跃 |
 | `run_c3_tuning.py` | Phase 7 超参调优脚本 | ✅ 活跃 |
 | `CODEMAP_MACB.md` | 本文件 | ✅ 活跃 |
@@ -1276,14 +1276,14 @@ Python `and` 短路救了它：`program_ot_loss_module is None` → 条件 False
 **全方法 AUC 排名**:
 | 排名 | 方法 | AUC |
 |:---|:---|---:|
-| 1 | **MMPA Combo (K=3, λ=0.005)** | **0.6189** |
-| 2 | MMPA C3_K_3 | 0.6178 |
-| 3 | MMPA C3_λ=0.005 | 0.6139 |
-| 4 | MMPA C3_λ=0.02 | 0.6078 |
-| 5 | MMPA C3 (ConvNeXt1D d=1) | 0.5924 |
-| 6 | MMPA C2 (GRN-MLP) | 0.5903 |
-| 7 | MMPA OT1 (MLP) | 0.5798 |
-| 8 | MMPA C0 (Phase 2) | 0.5763 |
+| 1 | **AdaDRP Combo (K=3, λ=0.005)** | **0.6189** |
+| 2 | AdaDRP C3_K_3 | 0.6178 |
+| 3 | AdaDRP C3_λ=0.005 | 0.6139 |
+| 4 | AdaDRP C3_λ=0.02 | 0.6078 |
+| 5 | AdaDRP C3 (ConvNeXt1D d=1) | 0.5924 |
+| 6 | AdaDRP C2 (GRN-MLP) | 0.5903 |
+| 7 | AdaDRP OT1 (MLP) | 0.5798 |
+| 8 | AdaDRP C0 (Phase 2) | 0.5763 |
 | 9 | 原始 MACB-DRP | 0.5575 |
 | 10 | TransDRP | 0.5440 |
 
@@ -1296,7 +1296,7 @@ Python `and` 短路救了它：`program_ot_loss_module is None` → 条件 False
 
 ### 24.1 背景
 
-在 B0 (MMPA Combo K=3 + λ_ot=0.005) 基础上，尝试引入 **fragment-level 细粒度药物表征**，通过 BRICS 分解得到药物 fragment，计算 fragment 与 program token 的 pair attention，作为 residual branch 修正预测 logits。
+在 B0 (AdaDRP Combo K=3 + λ_ot=0.005) 基础上，尝试引入 **fragment-level 细粒度药物表征**，通过 BRICS 分解得到药物 fragment，计算 fragment 与 program token 的 pair attention，作为 residual branch 修正预测 logits。
 
 **核心设计**：
 - `DrugFragmentEncoder`: 将 Morgan FP 编码为 fragment embedding
@@ -1393,7 +1393,7 @@ Python `and` 短路救了它：`program_ot_loss_module is None` → 条件 False
 #### 运行命令（0.6031）*****************************************
 
 ```bash
-python train_mmpa_program.py \
+python train_adadrp_program.py \
   --measurement Z_SCORE \
   --thres_gdsc 0.0 \
   --thres_label 0.1 \
@@ -1493,20 +1493,20 @@ FPI-SIM（Signal-style selective interaction）在第一轮 gamma=0 配置下失
 
 | 文件 | 说明 | 状态 |
 |------|------|------|
-| `mmpa_drp/models.py` | `MolecularProgramEncoder`, `ProgramTissueClassifier`, `ProgramFusionMLP`, `FPISIMInteraction` | ✅ 活跃 |
-| `mmpa_drp/backbones.py` | `ConvNeXt1DBackbone`, `GRNMLPBackbone` | ✅ 活跃 (Phase 5) |
-| `mmpa_drp/losses.py` | diversity, sparsity, entropy_floor, gate_balance, gate_diversity | ✅ 活跃 |
-| `mmpa_drp/ot_utils.py` | Sinkhorn, OT alignment, `ProgramOTLoss` (含 q_mass_flattened) | ✅ 活跃 (Phase 6-R) |
-| `mmpa_drp/grad_diagnostics.py` | 梯度诊断工具 | ✅ 活跃 (Phase 6-R) |
-| `mmpa_drp/fpi.py` | `FragmentProgramInteraction`, `FPISIMInteraction` | ✅ 活跃 (Phase 9) |
-| `mmpa_drp/fragment_encoder.py` | `DrugFragmentEncoder` | ✅ 活跃 (Phase 9) |
-| `mmpa_drp/fragment_utils.py` | `load_drug_fragments` | ✅ 活跃 (Phase 9) |
-| `mmpa_drp/stage1_program.py` | Stage 1 训练 | ✅ 活跃 |
-| `mmpa_drp/stage2_program.py` | Stage 2&3 训练（含 OT + Program OT + q_align + FPI） | ✅ 活跃 |
-| `train_mmpa_program.py` | MMPA-DRP 训练主入口 | ✅ 活跃 |
+| `adadrp/models.py` | `MolecularProgramEncoder`, `ProgramTissueClassifier`, `ProgramFusionMLP`, `FPISIMInteraction` | ✅ 活跃 |
+| `adadrp/backbones.py` | `ConvNeXt1DBackbone`, `GRNMLPBackbone` | ✅ 活跃 (Phase 5) |
+| `adadrp/losses.py` | diversity, sparsity, entropy_floor, gate_balance, gate_diversity | ✅ 活跃 |
+| `adadrp/ot_utils.py` | Sinkhorn, OT alignment, `ProgramOTLoss` (含 q_mass_flattened) | ✅ 活跃 (Phase 6-R) |
+| `adadrp/grad_diagnostics.py` | 梯度诊断工具 | ✅ 活跃 (Phase 6-R) |
+| `adadrp/fpi.py` | `FragmentProgramInteraction`, `FPISIMInteraction` | ✅ 活跃 (Phase 9) |
+| `adadrp/fragment_encoder.py` | `DrugFragmentEncoder` | ✅ 活跃 (Phase 9) |
+| `adadrp/fragment_utils.py` | `load_drug_fragments` | ✅ 活跃 (Phase 9) |
+| `adadrp/stage1_program.py` | Stage 1 训练 | ✅ 活跃 |
+| `adadrp/stage2_program.py` | Stage 2&3 训练（含 OT + Program OT + q_align + FPI） | ✅ 活跃 |
+| `train_adadrp_program.py` | AdaDRP 训练主入口 | ✅ 活跃 |
 | `CODEMAP_MACB.md` | 本文件 | ✅ 活跃 |
 
-### 已停止的模块（代码保留在 `mmpa_drp/` 中作为历史记录）
+### 已停止的模块（代码保留在 `adadrp/` 中作为历史记录）
 
 | 模块 | 停止原因 |
 |------|----------|
@@ -1566,7 +1566,7 @@ effective_gamma_cross = schedule_factor(epoch)
 
 #### 24.10.3 实现细节
 
-**文件**: `mmpa_drp/fpi.py` — `DualFPIResidualRouter`
+**文件**: `adadrp/fpi.py` — `DualFPIResidualRouter`
 
 | 组件 | 类/参数 | 说明 |
 |:---|:---|:---|
@@ -1578,20 +1578,20 @@ effective_gamma_cross = schedule_factor(epoch)
 | Oracle mask | `router_cross_mode="oracle_mask"` | **仅诊断用**，强制指定药物使用 cross |
 | Diagnostics | `branch_preference`, `branch_effect_ratio` | 自动判断每个药物偏好哪个分支 |
 
-**文件**: `mmpa_drp/models.py` — `ProgramFusionMLP`
+**文件**: `adadrp/models.py` — `ProgramFusionMLP`
 
 - `__init__`: 新增 `use_fpi_router`, `fpi_router_config` 参数
 - `forward`: 当 `use_fpi_router=True` 时，调用 `self.fpi_router(..., current_epoch, drug_names)`
 - 互斥检查：`use_fpi_router` 与 `use_fpi`, `use_bpaf`, `use_llrf`, `use_dspi`, `use_drug_gate` 不能共存
 
-**文件**: `mmpa_drp/stage2_program.py`
+**文件**: `adadrp/stage2_program.py`
 
 - `fusion_training_program`: 读取 `use_fpi_router`, `lambda_router_gamma_l1`, `fpi_router_config`
 - `_fusion_model_train_step_with_fpi`: 新增 `current_epoch`, `drug_names`, `lambda_router_gamma_l1` 参数
 - Router loss: `lambda_router_gamma_l1 * (|gamma_global| + |gamma_cross|).mean()`
 - 互斥：`use_fpi_router=True` 时，`use_fpi` 自动置为 False
 
-**文件**: `train_mmpa_program.py`
+**文件**: `train_adadrp_program.py`
 
 新增 argparse 参数（共 12 个）：
 - `--use_fpi_router`
@@ -1618,7 +1618,7 @@ effective_gamma_cross = schedule_factor(epoch)
 #### 24.10.5 互斥逻辑
 
 ```python
-# train_mmpa_program.py
+# train_adadrp_program.py
 if args.use_fpi_router and (args.use_fpi or args.use_bpaf or ...):
     parser.error("...")
 
@@ -1680,7 +1680,7 @@ Router forward 返回的 dict 包含丰富的 diagnostics：
 
 **实验命令**（修复前）：
 ```bash
-python train_mmpa_program.py --use_fpi_router \
+python train_adadrp_program.py --use_fpi_router \
   --router_gamma_global_max 0.05 --router_gamma_global_init 0.05 \
   --router_gamma_cross_max 0.05 --router_gamma_cross_init 0.0 \
   --lambda_router_gamma_l1 0.0 \
@@ -1747,7 +1747,7 @@ self.global_fpi = FragmentProgramInteraction(
 
 再次诊断发现：**`use_fpi_router` 根本没有传给 `ProgramFusionMLP`**！
 
-在 `mmpa_drp/stage2_program.py` 的 `fusion_training_program` 中：
+在 `adadrp/stage2_program.py` 的 `fusion_training_program` 中：
 ```python
 fusion_model = ProgramFusionMLP(
     encoder=encoder,
@@ -1767,7 +1767,7 @@ fusion_model = ProgramFusionMLP(
 
 **实际运行的是纯 B0 baseline**（AUC 0.5555 只是该次随机种子的结果）。
 
-**修复**（`mmpa_drp/stage2_program.py`）：
+**修复**（`adadrp/stage2_program.py`）：
 ```python
 fusion_model = ProgramFusionMLP(
     encoder=encoder,
@@ -1792,17 +1792,17 @@ fusion_model = ProgramFusionMLP(
 
 | 文件 | 说明 | 状态 |
 |------|------|------|
-| `mmpa_drp/models.py` | `MolecularProgramEncoder`, `ProgramTissueClassifier`, `ProgramFusionMLP`, `FPISIMInteraction`, **DualFPIResidualRouter** | ✅ 活跃 |
-| `mmpa_drp/backbones.py` | `ConvNeXt1DBackbone`, `GRNMLPBackbone` | ✅ 活跃 (Phase 5) |
-| `mmpa_drp/losses.py` | diversity, sparsity, entropy_floor, gate_balance, gate_diversity | ✅ 活跃 |
-| `mmpa_drp/ot_utils.py` | Sinkhorn, OT alignment, `ProgramOTLoss` (含 q_mass_flattened) | ✅ 活跃 (Phase 6-R) |
-| `mmpa_drp/grad_diagnostics.py` | 梯度诊断工具 | ✅ 活跃 (Phase 6-R) |
-| `mmpa_drp/fpi.py` | `FragmentProgramInteraction`, `FPISIMInteraction`, **DualFPIResidualRouter** | ✅ 活跃 (Phase 9-R) |
-| `mmpa_drp/fragment_encoder.py` | `DrugFragmentEncoder` | ✅ 活跃 (Phase 9) |
-| `mmpa_drp/fragment_utils.py` | `load_drug_fragments` | ✅ 活跃 (Phase 9) |
-| `mmpa_drp/stage1_program.py` | Stage 1 训练 | ✅ 活跃 |
-| `mmpa_drp/stage2_program.py` | Stage 2&3 训练（含 OT + Program OT + q_align + FPI + **Router**） | ✅ 活跃 |
-| `train_mmpa_program.py` | MMPA-DRP 训练主入口 | ✅ 活跃 |
+| `adadrp/models.py` | `MolecularProgramEncoder`, `ProgramTissueClassifier`, `ProgramFusionMLP`, `FPISIMInteraction`, **DualFPIResidualRouter** | ✅ 活跃 |
+| `adadrp/backbones.py` | `ConvNeXt1DBackbone`, `GRNMLPBackbone` | ✅ 活跃 (Phase 5) |
+| `adadrp/losses.py` | diversity, sparsity, entropy_floor, gate_balance, gate_diversity | ✅ 活跃 |
+| `adadrp/ot_utils.py` | Sinkhorn, OT alignment, `ProgramOTLoss` (含 q_mass_flattened) | ✅ 活跃 (Phase 6-R) |
+| `adadrp/grad_diagnostics.py` | 梯度诊断工具 | ✅ 活跃 (Phase 6-R) |
+| `adadrp/fpi.py` | `FragmentProgramInteraction`, `FPISIMInteraction`, **DualFPIResidualRouter** | ✅ 活跃 (Phase 9-R) |
+| `adadrp/fragment_encoder.py` | `DrugFragmentEncoder` | ✅ 活跃 (Phase 9) |
+| `adadrp/fragment_utils.py` | `load_drug_fragments` | ✅ 活跃 (Phase 9) |
+| `adadrp/stage1_program.py` | Stage 1 训练 | ✅ 活跃 |
+| `adadrp/stage2_program.py` | Stage 2&3 训练（含 OT + Program OT + q_align + FPI + **Router**） | ✅ 活跃 |
+| `train_adadrp_program.py` | AdaDRP 训练主入口 | ✅ 活跃 |
 | `run_ablation_fpi_router.py` | Phase 9-R 消融实验脚本 | ✅ 新增 |
 | `tests/test_fpi_router.py` | Router smoke tests (7/7 通过) | ✅ 新增 |
 | `CODEMAP_MACB.md` | 本文件 | ✅ 活跃 |
@@ -1839,7 +1839,7 @@ fusion_model = ProgramFusionMLP(
 
 **实验 A — C3_K_3 (λ_ot=0.01)** — AUC 胜出
 ```bash
-python3 train_mmpa_program.py \
+python3 train_adadrp_program.py \
     --train --use_ot_alignment --use_cdan \
     --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7 \
     --lambda_ot 0.01 --n 5 --alph 0.3 --beta 0.3 --K 3
@@ -1847,7 +1847,7 @@ python3 train_mmpa_program.py \
 
 **实验 B — Combo Best (λ_ot=0.005)** — 历史最佳配置复现
 ```bash
-python3 train_mmpa_program.py \
+python3 train_adadrp_program.py \
     --train --use_ot_alignment --use_cdan \
     --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7 \
     --lambda_ot 0.005 --n 5 --alph 0.3 --beta 0.3 --K 3
@@ -2065,7 +2065,7 @@ Stage B: 加载 checkpoint → 冻结 encoder/fusion/cdan/global_fpi/attention_m
 #### Stage A: Global-only Checkpoint 训练（保存 checkpoint）
 
 ```bash  0.5480
-python train_mmpa_program.py \
+python train_adadrp_program.py \
   --measurement Z_SCORE \
   --thres_gdsc 0.0 --thres_label 0.1 \
   --n 5 --alph 0.3 --beta 0.3 --train \
@@ -2084,7 +2084,7 @@ python train_mmpa_program.py \
 #### Stage B: Two-stage Cross-only 训练
 
 ```bash
-python train_mmpa_program.py \
+python train_adadrp_program.py \
   --measurement Z_SCORE \
   --thres_gdsc 0.0 --thres_label 0.1 \
   --n 5 --alph 0.3 --beta 0.3 --train \
@@ -2132,10 +2132,10 @@ python scripts/analyze_phase9_router_ablation.py
 
 | 文件 | 说明 | 状态 |
 |------|------|------|
-| `mmpa_drp/models.py` | `MolecularProgramEncoder`, `ProgramFusionMLP`, `DualFPIResidualRouter` | ✅ 活跃 |
-| `mmpa_drp/fpi.py` | `FragmentProgramInteraction`, `DualFPIResidualRouter` | ✅ 活跃 |
-| `mmpa_drp/stage2_program.py` | Stage 2&3 训练（含 Two-stage + freeze + eval 逻辑） | ✅ 活跃 |
-| `train_mmpa_program.py` | MMPA-DRP 训练主入口（含 router 参数） | ✅ 活跃 |
+| `adadrp/models.py` | `MolecularProgramEncoder`, `ProgramFusionMLP`, `DualFPIResidualRouter` | ✅ 活跃 |
+| `adadrp/fpi.py` | `FragmentProgramInteraction`, `DualFPIResidualRouter` | ✅ 活跃 |
+| `adadrp/stage2_program.py` | Stage 2&3 训练（含 Two-stage + freeze + eval 逻辑） | ✅ 活跃 |
+| `train_adadrp_program.py` | AdaDRP 训练主入口（含 router 参数） | ✅ 活跃 |
 | `run_ablation_fpi_router_diagnosis.py` | Phase 9-F 诊断实验脚本 | ✅ 活跃 |
 | `scripts/analyze_phase9_router_ablation.py` | 诊断结果自动汇总 | ✅ 活跃 |
 | `CODEMAP_MACB.md` | 本文件 | ✅ 活跃 |
@@ -2223,7 +2223,7 @@ auc_aupr_metrics：0.6294/0.1666
 
 ********************************有OT******************************************
 0.5779
-python train_mmpa_program.py \
+python train_adadrp_program.py \
   --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5 \
   --alph 0.3 --beta 0.3 --train \
   --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7 \
@@ -2245,7 +2245,7 @@ auc：0.5779/0.1020  aupr：0.7136/0.1760  acc：0.4093/0.2053  f1：0.5034/0.13
 all_metrics：0.5511/0.1925
 auc_aupr_metrics：0.6458/0.1576
 
-python train_mmpa_program.py --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5 --alph 0.3 --beta 0.3 --train --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7 --num_programs 8 --program_dim 64 --K 3 --use_ot_alignment --lambda_ot 0.005 --use_cdan
+python train_adadrp_program.py --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5 --alph 0.3 --beta 0.3 --train --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7 --num_programs 8 --program_dim 64 --K 3 --use_ot_alignment --lambda_ot 0.005 --use_cdan
 
 5-fold average/std results: 
 5-Fluorouracil    auc: 0.5865/0.0293 | aupr: 0.6900/0.0372 | f1: 0.4836/0.0766 | acc: 0.3651/0.2124
@@ -2263,7 +2263,7 @@ auc：0.5779/0.1020  aupr：0.7136/0.1760  acc：0.4093/0.2053  f1：0.5034/0.13
 all_metrics：0.5511/0.1925
 auc_aupr_metrics：0.6458/0.1576
 ************************************无FPI+convnext_depth1*******************
-  python3 train_mmpa_program.py \
+  python3 train_adadrp_program.py \
     --train --use_ot_alignment --use_cdan \
     --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7 \
     --lambda_ot 0.01 --n 5 --alph 0.3 --beta 0.3 --K 3
@@ -2286,7 +2286,7 @@ auc_aupr_metrics：0.6540/0.1618
 
 **************************************有FPI***********************************
 0.6031
- python train_mmpa_program.py \
+ python train_adadrp_program.py \
   --measurement Z_SCORE \
   --thres_gdsc 0.0 \
   --thres_label 0.1 \
@@ -2327,7 +2327,7 @@ all_metrics：0.5776/0.1825
 auc_aupr_metrics：0.6701/0.1467
 
 *********************stage1分为shared和private domain+OT，无FPI**********
-python train_mmpa_program.py \
+python train_adadrp_program.py \
   --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5 \
   --train --backbone_type convnext1d --convnext_depth 1 \
   --num_programs 8 --program_dim 64 --K 3 \
@@ -2355,7 +2355,7 @@ all_metrics：0.6649/0.1603
 auc_aupr_metrics：0.6740/0.1511  
 
 ***********************************+fpi*******************
-python train_mmpa_program.py   --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5   --train --backbone_type convnext1d --convnext_depth 1   --num_programs 8 --program_dim 64 --K 3   --use_ot_alignment --lambda_ot 0.005 --use_cdan   --use_domain_sep --domain_sep_hidden_dim 256 --domain_sep_output_dim 64   --lambda_ortho 0.001 --lambda_recon 0.005 --lambda_private_domain 0.005   --lambda_migrate 0.01   --alph 1.4   --use_fpi --fpi_gamma_max 0.1   --pretrain_num_epochs 100 --train_num_epochs 100 --contrastive_num_epochs 100
+python train_adadrp_program.py   --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5   --train --backbone_type convnext1d --convnext_depth 1   --num_programs 8 --program_dim 64 --K 3   --use_ot_alignment --lambda_ot 0.005 --use_cdan   --use_domain_sep --domain_sep_hidden_dim 256 --domain_sep_output_dim 64   --lambda_ortho 0.001 --lambda_recon 0.005 --lambda_private_domain 0.005   --lambda_migrate 0.01   --alph 1.4   --use_fpi --fpi_gamma_max 0.1   --pretrain_num_epochs 100 --train_num_epochs 100 --contrastive_num_epochs 100
 
 5-fold average/std results: 
 5-Fluorouracil    auc: 0.6251/0.0569 | aupr: 0.7298/0.0436 | f1: 0.6091/0.0318 | acc: 0.7078/0.0356
@@ -2373,7 +2373,7 @@ auc：0.6174/0.0843  aupr：0.7535/0.1597  acc：0.6611/0.2316  f1：0.6554/0.09
 all_metrics：0.6719/0.1607
 auc_aupr_metrics：0.6855/0.1434
 ***********************-fpi
-python train_mmpa_program.py   --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5   --train --backbone_type convnext1d --convnext_depth 1   --num_programs 8 --program_dim 64 --K 3   --use_ot_alignment --lambda_ot 0.005 --use_cdan   --use_domain_sep --domain_sep_hidden_dim 256 --domain_sep_output_dim 64   --lambda_ortho 0.001 --lambda_recon 0.005 --lambda_private_domain 0.005   --lambda_migrate 0.01   --alph 1.4 --pretrain_num_epochs 100 --train_num_epochs 100 --contrastive_num_epochs 100
+python train_adadrp_program.py   --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5   --train --backbone_type convnext1d --convnext_depth 1   --num_programs 8 --program_dim 64 --K 3   --use_ot_alignment --lambda_ot 0.005 --use_cdan   --use_domain_sep --domain_sep_hidden_dim 256 --domain_sep_output_dim 64   --lambda_ortho 0.001 --lambda_recon 0.005 --lambda_private_domain 0.005   --lambda_migrate 0.01   --alph 1.4 --pretrain_num_epochs 100 --train_num_epochs 100 --contrastive_num_epochs 100
                               0       1       2       3       4
 drug             metric                                        
 5-Fluorouracil   auc     0.6312  0.6466  0.5609  0.5788  0.5325
@@ -2432,7 +2432,7 @@ auc_aupr_metrics：0.6572/0.1621
 ******************************
 ********************************************
 **********************************stage3分离的改进，原有的直接分离，现有在药物基础上分离(per-drug KNN)******************
-python train_mmpa_program.py   --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5   --train --backbone_type convnext1d --convnext_depth 1   --num_programs 8 --program_dim 64 --K 3   --use_ot_alignment --lambda_ot 0.005 --use_cdan   --use_domain_sep --domain_sep_hidden_dim 256 --domain_sep_output_dim 64   --lambda_ortho 0.001 --lambda_recon 0.005 --lambda_private_domain 0.005   --lambda_migrate 0.01   --alph 1.4   --use_fpi --fpi_gamma_max 0.1   --pretrain_num_epochs 100 --train_num_epochs 100 --contrastive_num_epochs 100
+python train_adadrp_program.py   --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5   --train --backbone_type convnext1d --convnext_depth 1   --num_programs 8 --program_dim 64 --K 3   --use_ot_alignment --lambda_ot 0.005 --use_cdan   --use_domain_sep --domain_sep_hidden_dim 256 --domain_sep_output_dim 64   --lambda_ortho 0.001 --lambda_recon 0.005 --lambda_private_domain 0.005   --lambda_migrate 0.01   --alph 1.4   --use_fpi --fpi_gamma_max 0.1   --pretrain_num_epochs 100 --train_num_epochs 100 --contrastive_num_epochs 100
 
 5-fold average/std results: 
 5-Fluorouracil    auc: 0.6225/0.0393 | aupr: 0.7245/0.0369 | f1: 0.6036/0.0354 | acc: 0.6981/0.0506
@@ -2451,7 +2451,7 @@ all_metrics：0.6747/0.1570
 auc_aupr_metrics：0.6875/0.1414
 
  --beta 0.1
- python train_mmpa_program.py
+ python train_adadrp_program.py
 --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5 --train
 --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7
 --num_programs 8 --program_dim 64 --K 3
@@ -2471,9 +2471,9 @@ auc_aupr_metrics：0.6875/0.1414
 5-fold average/std results: 5-Fluorouracil auc: 0.6308/0.0803 | aupr: 0.7268/0.0646 | f1: 0.6245/0.0322 | acc: 0.7322/0.0372 Cisplatin auc: 0.6524/0.0275 | aupr: 0.8352/0.0155 | f1: 0.7122/0.0056 | acc: 0.8160/0.0078 Cyclophosphamide auc: 0.6873/0.0437 | aupr: 0.9548/0.0086 | f1: 0.8329/0.0447 | acc: 0.9059/0.0279 Docetaxel auc: 0.5479/0.0631 | aupr: 0.7325/0.0413 | f1: 0.5862/0.0874 | acc: 0.6873/0.1331 Doxorubicin auc: 0.6023/0.0346 | aupr: 0.8409/0.0131 | f1: 0.6126/0.1082 | acc: 0.7075/0.1548 Etoposide auc: 0.7378/0.0702 | aupr: 0.9135/0.0362 | f1: 0.8271/0.0492 | acc: 0.8946/0.0404 Gemcitabine auc: 0.5777/0.0201 | aupr: 0.5871/0.0249 | f1: 0.5287/0.0402 | acc: 0.5512/0.1091 Paclitaxel auc: 0.5551/0.0241 | aupr: 0.7350/0.0245 | f1: 0.6486/0.0572 | acc: 0.7628/0.0698 Temozolomide auc: 0.6067/0.0587 | aupr: 0.4395/0.0842 | f1: 0.7537/0.0075 | acc: 0.0763/0.0602 4 metrics average/std results: 5-Fluorouracil: 0.6786/0.0741 | Cisplatin: 0.7540/0.0784 | Cyclophosphamide: 0.8452/0.1083 | Docetaxel: 0.6385/0.1112 | Doxorubicin: 0.6908/0.1322 | Etoposide: 0.8432/0.0846 | Gemcitabine: 0.5611/0.0601 | Paclitaxel: 0.6754/0.0944 | Temozolomide: 0.4691/0.2648 auc&aupr average/std results:5-Fluorouracil: 0.6788/0.0853 | Cisplatin: 0.7438/0.0986 | Cyclophosphamide: 0.8210/0.1441 | Docetaxel: 0.6402/0.1095 | Doxorubicin: 0.7216/0.1282 | Etoposide: 0.8256/0.1065 | Gemcitabine: 0.5824/0.0219 | Paclitaxel: 0.6450/0.0976 | Temozolomide: 0.5231/0.1116 auc：0.6220/0.0755 aupr：0.7517/0.1585 acc：0.6815/0.2522 f1：0.6807/0.1146 all_metrics：0.6840/0.1685 auc_aupr_metrics：0.6868/0.1388 
 
 
- python train_mmpa_program.py --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5 --train --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7 --num_programs 8 --program_dim 64 --K 3 --use_ot_alignment --lambda_ot 0.005 --ot_reg 0.1 --ot_cost_type cosine --ot_marginal_type uniform --use_cdan --use_domain_sep --domain_sep_hidden_dim 256 --domain_sep_output_dim 64 --lambda_ortho 0.001 --lambda_recon 0.005 --lambda_private_domain 0.005 --lambda_migrate 0.01 --alph 1.4 --beta 0.066 --use_fpi --fpi_gamma_max 0.1 --fpi_gamma_init 0.05 --fpi_q_prior_weight 0.01 --fpi_dropout 0.1 --fpi_m_max 16 --fpi_fp_dim 1024 --lambda_fpi_gamma_l1 0.001 --fpi_detach_mode none --pretrain_num_epochs 100 --train_num_epochs 100 --contrastive_num_epochs 100
+ python train_adadrp_program.py --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5 --train --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7 --num_programs 8 --program_dim 64 --K 3 --use_ot_alignment --lambda_ot 0.005 --ot_reg 0.1 --ot_cost_type cosine --ot_marginal_type uniform --use_cdan --use_domain_sep --domain_sep_hidden_dim 256 --domain_sep_output_dim 64 --lambda_ortho 0.001 --lambda_recon 0.005 --lambda_private_domain 0.005 --lambda_migrate 0.01 --alph 1.4 --beta 0.066 --use_fpi --fpi_gamma_max 0.1 --fpi_gamma_init 0.05 --fpi_q_prior_weight 0.01 --fpi_dropout 0.1 --fpi_m_max 16 --fpi_fp_dim 1024 --lambda_fpi_gamma_l1 0.001 --fpi_detach_mode none --pretrain_num_epochs 100 --train_num_epochs 100 --contrastive_num_epochs 100
 
-python train_mmpa_program.py \
+python train_adadrp_program.py \
   --measurement Z_SCORE --thres_gdsc 0.0 --thres_label 0.1 --n 5 \
   --train --backbone_type convnext1d --convnext_depth 1 --convnext_kernel_size 7 \
   --num_programs 8 --program_dim 64 --K 9 \

@@ -13,7 +13,7 @@ Optional:
 
 For each variant, the script:
   1. Patches models.py
-  2. Runs train_mmpa_program.py
+  2. Runs train_adadrp_program.py
   3. Restores models.py
   4. Records AUC
 
@@ -37,7 +37,7 @@ from datetime import datetime
 # Configuration
 # ============================================================================
 BASE_CMD = [
-    "python", "train_mmpa_program.py",
+    "python", "train_adadrp_program.py",
     "--measurement", "Z_SCORE",
     "--thres_gdsc", "0.0",
     "--thres_label", "0.1",
@@ -78,8 +78,8 @@ BASE_CMD = [
     "--contrastive_num_epochs", "100",
 ]
 
-MODELS_PATH = "mmpa_drp/models.py"
-MODELS_BACKUP = "mmpa_drp/models.py.domainsep_ablation_backup"
+MODELS_PATH = "adadrp/models.py"
+MODELS_BACKUP = "adadrp/models.py.domainsep_ablation_backup"
 
 EXPERIMENT_TIMEOUT = 7200  # 2 hours
 LOGDIR_MAX_WAIT = 300  # 5 minutes

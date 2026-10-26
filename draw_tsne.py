@@ -1,6 +1,6 @@
 """
 T-SNE 可视化脚本
-用于可视化 MACB-DRP/MMPA-DRP 模型提取的特征
+用于可视化 MACB-DRP/AdaDRP 模型提取的特征
 """
 import os
 import argparse

@@ -38,13 +38,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config
 from dataload import get_multi_labeled_dataloader, get_drug_feat
-from mmpa_drp.models import MolecularProgramEncoder, ProgramFusionMLP
-from mmpa_drp.fragment_utils import load_drug_fragments
+from adadrp.models import MolecularProgramEncoder, ProgramFusionMLP
+from adadrp.fragment_utils import load_drug_fragments
 
 warnings.filterwarnings('ignore')
 
 # =============================================================================
-# 0. Constants matching train_mmpa_program.py defaults
+# 0. Constants matching train_adadrp_program.py defaults
 # =============================================================================
 
 DRUGS = ["5-Fluorouracil", "Cisplatin", "Cyclophosphamide", "Docetaxel",
